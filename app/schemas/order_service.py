@@ -2,7 +2,7 @@ from pydantic import BaseModel,EmailStr, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime, timezone
 
-from .services import ServiceMinimalRead
+from .service import ServiceMinimalRead
 from .vehicle import VehicleRead
 
 class OrderServiceBase(BaseModel):
