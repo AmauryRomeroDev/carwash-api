@@ -25,3 +25,11 @@ class EmployeeRead(EmployeeBase):
     updated_at: Optional[datetime]=Field(default_factory=lambda:datetime.now())
 
     model_config = ConfigDict(from_attributes=True)
+    
+class EmployeeMinimalRead (EmployeeBase):
+    id:int
+    name: Optional[str]
+    last_name: Optional[str]
+    second_last_name: Optional[str]
+    
+    model_config = ConfigDict(from_attributes=True)
