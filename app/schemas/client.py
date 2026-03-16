@@ -3,9 +3,10 @@ from typing import Optional, List
 from datetime import datetime, timezone
 
 from .vehicle import VehicleMinimalRead
-from .user import UserMinimalBase
+from .user import UserMinimalRead
 
-class ClientBase(UserMinimalBase):
+class ClientBase(UserMinimalRead):
+    user_id: Optional[int] = None
     address: Optional[str]= Field(...,min_length=5, max_length=100)
     
 
@@ -20,10 +21,7 @@ class ClientUpdate(ClientBase):
 
 
 class ClientRead(ClientBase):
-    id: int
-    name: str
-    email: Optional[EmailStr]
-    phone: str
+    user: Optional[UserMinimalRead]
     is_active: bool
     vehicles: List[VehicleMinimalRead]=[]
     created_at: datetime=Field(default_factory=lambda:datetime.now(timezone.utc))
