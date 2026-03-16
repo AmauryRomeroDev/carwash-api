@@ -1,53 +1,54 @@
-# API Autolavado - Backend
+# Car Wash API - Backend
 
-API RESTful desarrollada en **FastAPI** (Python) para la gestión integral de un negocio de autolavado / lavado de autos.
+RESTful API developed with *FastAPI* (Python) for the comprehensive management of a car wash / detailing business.
 
-**Estado del proyecto:** En desarrollo inicial – Estructura base + esquemas principales
+**Project Status :** In initial development – Base structure + main schemas.
 
-## Descripción del negocio y funcionalidades clave
+## Business Description and Key Features
 
-- Registro y gestión de **clientes** registrados (para historial y posibles membresías)
-- Registro de **vehículos** asociados a clientes
-- **Servicios** de lavado y detailing (lavado básico, premium, encerado, aspirado, etc.)
-- **Productos** vendibles (químicos, aromatizantes, accesorios para auto, etc.)
-- Control de **inventario** (entradas de proveedor + salidas por uso en servicios o ventas directas)
-- **Tickets / Cobros** con dos modalidades principales:
-  - **Ticket de servicio**: lavado realizado en un vehículo → incluye servicios aplicados, vehículo, cliente (opcional), empleado que lavó, empleado que cobró, descuentos, etc.
-  - **Ticket de venta rápida**: venta de productos → puede ser a cliente registrado o anónimo, solo registra OUT de inventario + empleado cobrador
-- Roles de usuarios: clientes, empleados (lavadores, cajeros), administradores
+- **Client Management:** Registration and history tracking of customers, including support for future membership programs.
+- **Vehicle Registration:** Management of vehicles linked to specific clients for personalized tracking.
+- **Services:** Catalog of wash and detailing options (e.g., basic wash, premium, waxing, vacuuming).
+- **Products:** Inventory of saleable items such as chemicals, air fresheners, and car accessories.
+- **Inventory Control:** Tracking of stock-ins (suppliers) and stock-outs (service usage or direct sales).
+- **Tickets & Payments:** Managed through two specialized modules:
+  - ***Service Ticket***: Records a vehicle wash. Includes services applied, vehicle info, washer, cashier, and discounts.
+  - ***Quick Sale Ticket***: Handles direct product sales to registered or anonymous clients, triggering an inventory "OUT" movement.
+- **User Role:** Access control for Clients and Employees (Washers, Cashiers, and Administrators).
 
-## Tecnologías principales
+## Core Tech Stack
 
 - Python 3.10+
 - FastAPI
 - SQLAlchemy (ORM)
-- Pydantic v2 (esquemas de entrada/salida)
+- Pydantic v2 (IN/OUT schemas)
 - PostgreSQL (base de datos recomendada)
 - JWT para autenticación
 - python-dotenv
 
-## Estructura actual del proyecto
+## Actual Project Structure
 
 ```
 ├── app/
-│   ├── api/                    # routers y endpoints
-│   ├── core/                   # configuraciones, seguridad, excepciones
-│   ├── crud/                   # operaciones CRUD básicas
-│   ├── database/               # conexión a BD, sesiones
-│   ├── middlewares/            # middlewares personalizados
-│   ├── models/                 # modelos SQLAlchemy 
-│   └── schemas/                # esquemas Pydantic (entrada/salida API)
-│       ├── init.py
-│       ├── ticket.py          # cajero / movimientos de caja
-│       ├── client.py           # clientes
-│       ├── inventory_movements.py  # movimientos de inventario
-│       ├── products.py         # productos y servicios
-│       ├── services.py         # servicios de lavado 
-│       ├── user.py             # usuarios generales
-│       ├── vehicle.py          # vehículos
-│       └── vehicle_service.py  # relación servicio por vehiculo
-├── test/                       # pruebas 
-├── db.py                       # helper de conexión a BD
-├── main.py                     # punto de entrada FastAPI
+│   ├── api/                    # Routers & endpoints
+│   ├── core/                   # Config, security, exceptions
+│   ├── crud/                   # CRUD logic
+│   ├── database/               # DB connection & session
+│   ├── middlewares/            # Custom middlewares
+│   ├── models/                 # SQLAlchemy models
+│   └── schemas/                # Pydantic schemas (Data Validation)
+│       ├── __init__.py
+│       ├── user.py             # Base users
+│       ├── client.py           # Clients
+│       ├── employee.py         # Employees (Admin, Cashier & Washer)
+│       ├── inventory_movements.py  # Inventory tracking (IN & OUT)
+│       ├── product.py          # Products (soaps, etc.)
+│       ├── service.py          # Services offered 
+│       ├── order_product.py    # Product sales / Cashier
+│       ├── vehicle.py          # Vehicles
+│       └── order_service.py    # Service x Vehicle relationship
+├── tests/                      # Unit and integration tests
+├── db.py                       # DB connection helper
+├── main.py                     # Entry point 
 └── README.md
 ```
