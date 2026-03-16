@@ -1,6 +1,7 @@
 from pydantic import BaseModel,EmailStr, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime, timezone
+
 from .vehicle import VehicleMinimalRead
 from .user import UserMinimalBase
 
@@ -27,5 +28,14 @@ class ClientRead(ClientBase):
     vehicles: List[VehicleMinimalRead]=[]
     created_at: datetime=Field(default_factory=lambda:datetime.now(timezone.utc))
     updated_at: Optional[datetime]=Field(default_factory=lambda:datetime.now(timezone.utc))
+
+    model_config = ConfigDict(from_attributes=True)
+    
+class ClientMinimalRead(ClientBase):
+    id: int
+    name: str
+    last_name: str
+    email: Optional[EmailStr]
+    phone: str
 
     model_config = ConfigDict(from_attributes=True)
