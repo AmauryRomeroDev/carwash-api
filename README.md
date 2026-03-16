@@ -2,7 +2,7 @@
 
 RESTful API developed with *FastAPI* (Python) for the comprehensive management of a car wash / detailing business.
 
-**Project Status :** In initial development – Base structure + main schemas.
+**Project Status :** In initial development – Base structure, main schemas + main models.
 
 ## Business Description and Key Features
 

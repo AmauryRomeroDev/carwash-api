@@ -2,16 +2,16 @@ from sqlalchemy import Column, Integer,String, Boolean, DateTime, ForeignKey, fu
 from sqlalchemy.orm import relationship
 from database.connection import Base
 
-class Client(Base):
-    __tablename__ = "clients"
+class Employee(Base):
+    __tablename__ = "employees"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id",ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True)
     
-    address=Column(String(255), nullable=True)
+    role = Column(String(50), nullable=False) 
     
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
-    user=relationship("User",back_populates="client")
-    vehicles = relationship("Vehicle", back_populates="client", cascade="all, delete-orphan")
+    
+    user = relationship("User", back_populates="employee")
