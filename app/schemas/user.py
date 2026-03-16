@@ -38,8 +38,5 @@ class UserMinimalRead(BaseModel):
     second_last_name: Optional[str]
     phone: str
     email: Optional[EmailStr]
-    is_active:bool
-    created_at: datetime=Field(default_factory=lambda:datetime.now(timezone.utc))
-    updated_at: Optional[datetime]=Field(default_factory=lambda:datetime.now(timezone.utc))
 
     model_config = ConfigDict(from_attributes=True)
