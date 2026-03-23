@@ -7,3 +7,4 @@ from .product import ProductCreate,ProductMinimalRead,ProductRead,ProductUpdate
 from .service import ServiceCreate,ServiceMinimalRead,ServiceRead,ServiceUpdate
 from .user import UserCreate,UserMinimalRead,UserRead, UserUpdate
 from .vehicle import VehicleCreate,VehicleRead,VehicleUpdate
+from .comment import CommentCreate,CommentMainResponse,CommentReplyResponse

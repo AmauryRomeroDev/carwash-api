@@ -7,3 +7,4 @@ from .product import Product
 from .service import Service
 from .user import User
 from .vehicle import Vehicle
+from .comment import Comment
