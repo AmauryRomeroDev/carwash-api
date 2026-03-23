@@ -1,8 +1,12 @@
+#dependences.py
 from fastapi import Request, HTTPException, Depends
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm import Session 
 from app.database.connection import SessionLocal
 from app.models.user import User
+from fastapi.security import OAuth2PasswordBearer
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
 
 def get_db():
     db = SessionLocal()
@@ -10,7 +14,7 @@ def get_db():
     finally: db.close()
 
 
-def get_current_user(request: Request, db: Session = Depends(get_db)):
+def get_current_user(request: Request, db: Session = Depends(get_db),token:str=Depends(oauth2_scheme)):
     # request.state.user_id debe haber sido inyectado previamente por tu AuthMiddleware
     user_id = getattr(request.state, "user_id", None) 
     
