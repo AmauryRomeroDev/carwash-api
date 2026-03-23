@@ -15,3 +15,4 @@ class Client(Base):
 
     user=relationship("User",back_populates="client")
     vehicles = relationship("Vehicle", back_populates="client", cascade="all, delete-orphan")
+    orders=relationship("OrderService",back_populates="client")
