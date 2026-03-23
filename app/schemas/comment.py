@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import List, Optional
+from .user import UserMinimalRead
+from .service import ServiceMinimalRead
 
 # Responses
 class CommentReplyResponse(BaseModel):
@@ -15,16 +17,17 @@ class CommentReplyResponse(BaseModel):
 # Principal Comment
 class CommentMainResponse(BaseModel):
     id: int
-    user_name: str
-    user_photo: Optional[str]
     content: str
-    service_name: str
-    rating: int = Field(ge=1, le=5)
+    rating: Optional[int]
     created_at: datetime
-    replies: List[CommentReplyResponse] = []
+    # Accedemos a las relaciones de SQLAlchemy
+    author: Optional["UserMinimalRead"] 
+    service: Optional["ServiceMinimalRead"]
+    replies: List["CommentReplyResponse"] = []
 
     class Config:
         from_attributes = True
+
 
 # Para crear un comentario nuevo
 class CommentCreate(BaseModel):
