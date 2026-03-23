@@ -10,7 +10,7 @@ class VehicleBase(BaseModel):
     brand: str = Field(...,min_length=1, max_length=50)
     model: str = Field(...,min_length=1, max_length=50)
     color: Optional[str] = Field(None, min_length=1, max_length=30)
-    client_id: int
+    client_id: Optional[int]=None
     
 class VehicleCreate(VehicleBase):
     pass
@@ -20,7 +20,6 @@ class VehicleUpdate(BaseModel):
     brand: Optional[str] = Field(None, min_length=1, max_length=50)
     model: Optional[str] = Field(None, min_length=1, max_length=50)
     color: Optional[str] = Field(None, min_length=1, max_length=30)
-    client_id: Optional[int] = Field(None)
     
 class VehicleRead(VehicleBase):
     id: int

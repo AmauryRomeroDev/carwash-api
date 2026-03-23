@@ -1,5 +1,5 @@
 #dependences.py
-from fastapi import Request, HTTPException, Depends
+from fastapi import Request, HTTPException, Depends, status
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm import Session 
 from app.database.connection import SessionLocal
@@ -14,8 +14,7 @@ def get_db():
     finally: db.close()
 
 
-def get_current_user(request: Request, db: Session = Depends(get_db),token:str=Depends(oauth2_scheme)):
-    # request.state.user_id debe haber sido inyectado previamente por tu AuthMiddleware
+def get_current_user(request: Request, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
     user_id = getattr(request.state, "user_id", None) 
     
     if not user_id:
@@ -28,7 +27,15 @@ def get_current_user(request: Request, db: Session = Depends(get_db),token:str=D
 
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="La cuenta está desactivada"
+        )
+        
     return user
+
 
 
 class RoleChecker:
