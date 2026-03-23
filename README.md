@@ -46,6 +46,7 @@ RESTful API developed with *FastAPI* (Python) for the comprehensive management o
 │       ├── service.py          # Services offered 
 │       ├── order_product.py    # Product sales / Cashier
 │       ├── vehicle.py          # Vehicles
+│       ├── comment.py          # Comments
 │       └── order_service.py    # Service x Vehicle relationship
 ├── tests/                      # Unit and integration tests
 ├── db.py                       # DB connection helper
