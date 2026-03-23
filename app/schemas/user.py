@@ -9,7 +9,7 @@ class UserBase(BaseModel):
     phone: str= Field(..., pattern=r"^\+?\d{10,15}$")
     email: Optional[EmailStr]= None
     password: str = Field(...,min_length=6, max_length=255)
-    type: str = Field(...,min_length=2, max_length=20)
+    type: Optional[str] = "client"
     
 class UserCreate(UserBase):
     pass
@@ -27,7 +27,6 @@ class UserRead(UserBase):
     is_active:bool
     created_at: datetime=Field(default_factory=lambda:datetime.now(timezone.utc))
     updated_at: Optional[datetime]=Field(default_factory=lambda:datetime.now(timezone.utc))
-    updated_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
     

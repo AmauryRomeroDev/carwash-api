@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
+from app.api.v1.auth import router as auth_router
+from app.api.v1.users import router as users_router
 
 router = APIRouter()
 
-@router.get("/me")
-async def get_current_user_data(request: Request):
-    # El usuario ya fue validado por el middleware
-    user = request.state.user
-    return {"id": user.id, "email": user.email, "role": user.type}
+# Incluir sub-routers
+router.include_router(auth_router, prefix="/auth", tags=["Auth"])
+router.include_router(users_router, prefix="/users", tags=["Users"])

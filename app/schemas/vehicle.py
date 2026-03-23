@@ -1,8 +1,9 @@
 from pydantic import BaseModel,EmailStr, Field, ConfigDict
-from typing import Optional, List
+from typing import Optional, List,TYPE_CHECKING
 from datetime import datetime, timezone
 
-from .client import ClientMinimalRead
+if TYPE_CHECKING:
+    from .client import ClientMinimalRead
 
 class VehicleBase(BaseModel):
     license_plate: str = Field(...,min_length=1, max_length=20)
@@ -23,8 +24,21 @@ class VehicleUpdate(BaseModel):
     
 class VehicleRead(VehicleBase):
     id: int
-    client: Optional[ClientMinimalRead]
+    brand: Optional[str] = Field(None, min_length=1, max_length=50)
+    model: Optional[str] = Field(None, min_length=1, max_length=50)
+    color: Optional[str] = Field(None, min_length=1, max_length=30)
+    client: Optional['ClientMinimalRead']=None
     created_at: datetime=Field(default_factory=lambda:datetime.now(timezone.utc))
     updated_at: Optional[datetime]=Field(default_factory=lambda:datetime.now(timezone.utc))
 
     model_config = ConfigDict(from_attributes=True)
+    
+class VehicleMinimalRead(VehicleBase):
+    id: int
+    client: Optional['ClientMinimalRead']=None
+    created_at: datetime=Field(default_factory=lambda:datetime.now(timezone.utc))
+    updated_at: Optional[datetime]=Field(default_factory=lambda:datetime.now(timezone.utc))
+
+    model_config = ConfigDict(from_attributes=True)
+    
+

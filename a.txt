@@ -1,0 +1,10 @@
+{
+  "id": 1,
+  "name": "Amaury",
+  "last_name": "Romero",
+  "second_last_name": "Martínez",
+  "phone": "7641022230",
+  "email": "amau@example.com",
+  "user_id": 1,
+  "address": "ameles s/n"
+}

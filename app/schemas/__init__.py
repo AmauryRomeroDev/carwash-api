@@ -6,5 +6,10 @@ from .order_service import OrderServiceCreate,OrderServiceMinimalRead,OrderServi
 from .product import ProductCreate,ProductMinimalRead,ProductRead,ProductUpdate
 from .service import ServiceCreate,ServiceMinimalRead,ServiceRead,ServiceUpdate
 from .user import UserCreate,UserMinimalRead,UserRead, UserUpdate
-from .vehicle import VehicleCreate,VehicleRead,VehicleUpdate
+from .vehicle import VehicleCreate,VehicleRead,VehicleUpdate,VehicleMinimalRead
 from .comment import CommentCreate,CommentMainResponse,CommentReplyResponse
+from .auth import LoginRequest
+
+ClientRead.model_rebuild()
+VehicleRead.model_rebuild()
+VehicleMinimalRead.model_rebuild()
