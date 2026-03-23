@@ -1,0 +1,17 @@
+from sqlalchemy import Column, Integer,String, Boolean, DateTime, ForeignKey, func,DECIMAL
+from sqlalchemy.orm import relationship
+from database.connection import Base
+
+class Product(Base):
+    __tablename__="products"
+    id = Column(Integer, primary_key=True, index=True)
+    
+    description=Column(String(255), nullable=True)
+    unit_price=Column(DECIMAL(10,2),nullable=False,default=0.00)
+    stock=Column(Integer, nullable=False, default=0)
+    
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    orders=relationship("OrderProduct",back_populates="product")
+    movements=relationship("InventoryMovement",back_populates="product")
