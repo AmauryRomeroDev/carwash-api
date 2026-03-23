@@ -1,5 +1,6 @@
 from fastapi import Request, HTTPException, Depends
 from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import Session 
 from app.database.connection import SessionLocal
 from app.models.user import User
 
@@ -8,9 +9,14 @@ def get_db():
     try: yield db
     finally: db.close()
 
-def get_current_user(request: Request, db: SessionLocal = Depends(get_db)):
-    user_id = request.state.user_id # Viene del middleware
-    # Usamos joinedload para traer el perfil
+
+def get_current_user(request: Request, db: Session = Depends(get_db)):
+    # request.state.user_id debe haber sido inyectado previamente por tu AuthMiddleware
+    user_id = getattr(request.state, "user_id", None) 
+    
+    if not user_id:
+        raise HTTPException(status_code=401, detail="No se encontró información de sesión")
+
     user = db.query(User).options(
         joinedload(User.employee), 
         joinedload(User.client)
