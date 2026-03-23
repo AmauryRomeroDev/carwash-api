@@ -15,7 +15,11 @@ class UserCreate(UserBase):
     pass
 
 class UserUpdate(UserBase):
-    pass
+    name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
 
 class UserRead(UserBase):
     id: int
