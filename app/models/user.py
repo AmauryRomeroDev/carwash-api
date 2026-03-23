@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer,String, Boolean, DateTime, ForeignKey, fu
 from sqlalchemy.orm import relationship
 from database.connection import Base
 
-class user(Base):
+class User(Base):
     __tablename__="users"
     
     id= Column(Integer, primary_key=True, index=True)
