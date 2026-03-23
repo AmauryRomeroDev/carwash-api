@@ -17,3 +17,4 @@ class vehicle(Base):
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
     client=relationship("Client",back_populates="vehicles" )
+    orders=relationship("OrderService",back_populates="vehicle")
