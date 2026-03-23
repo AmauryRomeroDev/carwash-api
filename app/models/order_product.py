@@ -9,7 +9,7 @@ from sqlalchemy import (
     DECIMAL,
 )
 from sqlalchemy.orm import relationship
-from database.connection import Base
+from app.database.connection import Base
 
 
 class OrderProduct(Base):

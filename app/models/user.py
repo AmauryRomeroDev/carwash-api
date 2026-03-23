@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer,String, Boolean, DateTime, ForeignKey, func
 from sqlalchemy.orm import relationship
-from database.connection import Base
+from app.database.connection import Base
 
 class User(Base):
     __tablename__="users"
@@ -21,3 +21,4 @@ class User(Base):
 
     client=relationship("Client", back_populates="user", uselist=False, cascade="all, delete-orphan")
     employee=relationship("Employee", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    

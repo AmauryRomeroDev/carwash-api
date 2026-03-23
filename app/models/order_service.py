@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, func, DECIMAL
 from sqlalchemy.orm import relationship
-from database.connection import Base
+from app.database.connection import Base
 
 class OrderService(Base):
     __tablename__ = "order_services"
