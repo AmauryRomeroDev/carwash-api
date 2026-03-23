@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func, Enum
 import enum 
 from sqlalchemy.orm import relationship
-from database.connection import Base
+from app.database.connection import Base
 
 class MovementType(enum.Enum):
     IN = "entrada"
