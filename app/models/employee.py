@@ -9,6 +9,7 @@ class Employee(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True)
     
     role = Column(String(50), nullable=False) 
+    is_active=Column(Boolean, nullable=False, default=True)
     
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())

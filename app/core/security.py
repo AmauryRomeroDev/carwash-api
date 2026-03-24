@@ -1,5 +1,6 @@
 import bcrypt
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 from jose import jwt
 import os
 
@@ -25,9 +26,20 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     except Exception:
         return False
 
-def create_access_token(user_id: int, user_type: str, role: str = None):
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+def create_access_token(
+    user_id: int, 
+    user_type: str, 
+    role: Optional[str] = None, 
+    expires_delta: Optional[timedelta] = None  # <--- Agregamos este parámetro
+):
+    # 1. Calcular el tiempo de expiración
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        # Tiempo por defecto (30 min) si no se envía nada
+        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     
+    # 2. Preparar el contenido del token 
     to_encode = {
         "sub": str(user_id),
         "type": user_type,
@@ -35,4 +47,5 @@ def create_access_token(user_id: int, user_type: str, role: str = None):
         "exp": expire
     }
     
+    # 3. Firmar y retornar el JWT
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)

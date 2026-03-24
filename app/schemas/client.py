@@ -21,6 +21,7 @@ class ClientUpdate(ClientBase):
 
 
 class ClientRead(ClientBase):
+    id:int
     user: Optional[UserMinimalRead]
     is_active: bool
     vehicles: List['VehicleMinimalRead']=[]

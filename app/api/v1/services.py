@@ -32,10 +32,18 @@ def get_service(service_id: int, db: Session = Depends(get_db)):
 def create_service(
     data: ServiceCreate, 
     db: Session = Depends(get_db), 
-    _=Depends(allow_admin)
+    current_user = Depends(get_current_user), # Inyecta el usuario actual
+    _=Depends(allow_admin) 
 ):
-    if db.query(Service).filter(Service.name == data.name).first():
+    if db.query(Service).filter(Service.service_name == data.service_name).first():
         raise HTTPException(status_code=400, detail="Ya existe un servicio con ese nombre")
+    
+    new_service = Service(
+        service_name=data.service_name,
+        description=data.description,
+        price=data.price,
+        duration_minutes=data.duration_minutes
+    )
     
     new_service = Service(**data.model_dump())
     db.add(new_service)
