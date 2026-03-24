@@ -5,10 +5,12 @@ from app.database.connection import Base
 class Product(Base):
     __tablename__="products"
     id = Column(Integer, primary_key=True, index=True)
-    
+    product_name=Column(String)
     description=Column(String(255), nullable=True)
     unit_price=Column(DECIMAL(10,2),nullable=False,default=0.00)
     stock=Column(Integer, nullable=False, default=0)
+    
+    is_active=Column(Boolean,nullable=False,default=True)
     
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())

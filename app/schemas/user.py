@@ -7,6 +7,7 @@ class UserBase(BaseModel):
     last_name:str= Field(...,min_length=2, max_length=60)
     second_last_name: Optional[str]= Field(...,min_length=2, max_length=60)
     phone: str= Field(..., pattern=r"^\+?\d{10,15}$")
+    photo_url: Optional[str] = None 
     email: Optional[EmailStr]= None
     password: str = Field(...,min_length=6, max_length=255)
     type: Optional[str] = "client"
@@ -16,8 +17,9 @@ class UserCreate(UserBase):
 
 class UserUpdate(UserBase):
     name: Optional[str] = None
-    last_name: Optional[str] = None
+    last_name: Optional[str] = None 
     phone: Optional[str] = None
+    photo_url: Optional[str] = None 
     email: Optional[EmailStr] = None
     password: Optional[str] = None
 
@@ -39,7 +41,8 @@ class UserMinimalRead(BaseModel):
     name: str
     last_name:str
     second_last_name: Optional[str]
-    phone: str
+    phone: Optional[str] = None 
+    photo_url: Optional[str] = None 
     email: Optional[EmailStr]
 
     model_config = ConfigDict(from_attributes=True)

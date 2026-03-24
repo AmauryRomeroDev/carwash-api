@@ -6,6 +6,7 @@ from app.core.dependencies import get_current_user, RoleChecker
 from app.models.user import User
 from app.schemas.user import UserUpdate, UserRead
 from app.core.security import get_password_hash
+from app.models.session import UserSession
 
 router = APIRouter()
 
@@ -75,3 +76,11 @@ def deactivate_user(
     user.is_active = False
     db.commit()
     return None
+
+@router.post("/logout")
+def logout(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    session = db.query(UserSession).filter(UserSession.user_id == current_user.id).first()
+    if session:
+        session.is_active = False
+        db.commit()
+    return {"detail": "Sesión cerrada correctamente"}

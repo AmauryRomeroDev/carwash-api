@@ -6,7 +6,6 @@ from .employee import EmployeeMinimalRead
 from .product import ProductMinimalRead
 
 class OrderProductBase(BaseModel):
-    order_id: int
     product_id: int
     casher_id:int
     amount: int

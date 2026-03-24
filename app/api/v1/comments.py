@@ -6,35 +6,50 @@ from app.database.connection import get_db
 from app.core.dependencies import get_current_user
 from app.models.comment import Comment
 from app.models.user import User
+from app.models.service import Service
 from app.schemas.comment import CommentCreate, CommentMainResponse
 
 router = APIRouter()
 
-# --- CREATE (Cualquier usuario loggeado) ---
+# --- CREATE (Comentarios) ---
 @router.post("/", response_model=CommentMainResponse, status_code=status.HTTP_201_CREATED)
 def create_comment(
     data: CommentCreate, 
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
+    #  Limpiar IDs (0 a None)
+    p_id = data.parent_id if data.parent_id != 0 else None
+    s_id = data.service_id if data.service_id != 0 else None
+
+    # Validar que el servicio exista (si se proporcionó uno)
+    if s_id:
+        service_exists = db.query(Service).filter(Service.id == s_id).first()
+        if not service_exists:
+            raise HTTPException(status_code=400, detail="El servicio especificado no existe")
+
     # Validar que si es una respuesta, el padre exista
-    if data.parent_id:
-        parent = db.query(Comment).filter(Comment.id == data.parent_id).first()
+    if p_id:
+        parent = db.query(Comment).filter(Comment.id == p_id).first()
         if not parent:
             raise HTTPException(status_code=404, detail="El comentario original no existe")
 
     new_comment = Comment(
         content=data.content,
-        author_id=current_user.id, # El autor siempre es el usuario actual
-        service_id=data.service_id,
+        author_id=current_user.id,
+        service_id=s_id, # Usamos el ID limpio
         rating=data.rating,
-        parent_id=data.parent_id
+        parent_id=p_id   # Usamos el ID limpio (None si era 0)
     )
     
     db.add(new_comment)
     db.commit()
     db.refresh(new_comment)
+    
+  #  if new_comment.replies is None:
+   #     new_comment.replies = []
     return new_comment
+
 
 # --- READ (Público: Ver todos los comentarios principales con sus respuestas) ---
 @router.get("/", response_model=List[CommentMainResponse])

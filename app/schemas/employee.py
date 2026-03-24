@@ -18,7 +18,7 @@ class EmployeeRead(EmployeeBase):
     name: str
     last_name:str
     second_last_name: Optional[str]
-    phone: str
+    phone: Optional[str]
     email: Optional[str]
     is_active: bool
     created_at: datetime=Field(default_factory=lambda:datetime.now())
@@ -31,5 +31,6 @@ class EmployeeMinimalRead (EmployeeBase):
     name: Optional[str]
     last_name: Optional[str]
     second_last_name: Optional[str]
+    phone:Optional[str]
     
     model_config = ConfigDict(from_attributes=True)

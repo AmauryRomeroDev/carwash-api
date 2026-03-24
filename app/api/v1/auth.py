@@ -3,12 +3,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.database.connection import SessionLocal
+from datetime import timedelta
 from app.models.user import User
 from app.models.employee import Employee
 from app.models.client import Client
 from app.schemas.employee import EmployeeCreate
 from app.schemas.client import ClientCreate
 from app.schemas.auth import LoginRequest
+from app.models.session import UserSession
 from app.core.security import get_password_hash, verify_password, create_access_token
 
 def get_db():
@@ -25,7 +27,7 @@ def register_employee(data: EmployeeCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="El email ya está registrado")
 
-    # Mapeo cuidadoso: 'phone' en Pydantic -> 'phone_number' en SQLAlchemy
+    
     new_user = User(
         name=data.name,
         last_name=data.last_name,
@@ -85,13 +87,25 @@ def login(data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
 
     # Lógica de roles para el token
     role = user.employee.role if user.type == "employee" and user.employee else None
-
+    expires = timedelta(days=365) if user.type == "client" else timedelta(days=1)
+    
     token = create_access_token(
         user_id=user.id,
         user_type=user.type,
-        role=role
+        role=role,
+        expires_delta=expires
     )
-
+    # --- Lógica de Sesión Persistente (Upsert) ---
+    session = db.query(UserSession).filter(UserSession.user_id == user.id).first()
+    if session:
+        session.token = token
+        session.is_active = True
+    else:
+        new_session = UserSession(user_id=user.id, token=token)
+        db.add(new_session)
+    
+    db.commit()
+    
     return {
         "access_token": token,
         "token_type": "bearer",
