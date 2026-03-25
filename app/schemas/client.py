@@ -1,4 +1,4 @@
-from pydantic import BaseModel,EmailStr, Field, ConfigDict
+from pydantic import BaseModel,EmailStr, Field,computed_field ,ConfigDict,field_validator,model_validator
 from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime, timezone
 
@@ -22,7 +22,7 @@ class ClientUpdate(ClientBase):
 
 class ClientRead(ClientBase):
     id:int
-    user: Optional[UserMinimalRead]
+    client: Optional[UserMinimalRead]=None
     is_active: bool
     vehicles: List['VehicleMinimalRead']=[]
     created_at: datetime=Field(default_factory=lambda:datetime.now(timezone.utc))
@@ -30,13 +30,29 @@ class ClientRead(ClientBase):
 
     model_config = ConfigDict(from_attributes=True)
     
-class ClientMinimalRead(ClientBase):
+
+class ClientMinimalRead(BaseModel):
     id: int
-    name: str
-    last_name: str
-    email: Optional[EmailStr]
-    phone: str
+    name: str = "N/A"
+    last_name: str = "N/A"
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
-    
 
+    @model_validator(mode="before")
+    @classmethod
+    def get_user_data(cls, data):
+        # Si 'data' es un objeto de SQLAlchemy (Client)
+        user = getattr(data, "user", None)
+        if user:
+            # Extraemos los datos del objeto User y los inyectamos en el diccionario
+            # Ajusta 'full_name' o 'first_name' según como se llamen en tu modelo User
+            return {
+                "id": getattr(data, "id"),
+                "name": getattr(user, "name", getattr(user, "full_name", "N/A")),
+                "last_name": getattr(user, "last_name", "N/A"),
+                "email": getattr(user, "email", None),
+                "phone": getattr(user, "phone_number", None)
+            }
+        return data

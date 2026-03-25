@@ -28,7 +28,7 @@ class UserRead(UserBase):
     name: str
     last_name:str
     second_last_name: Optional[str]
-    phone: str
+    phone: Optional[str]
     email: Optional[EmailStr]
     is_active:bool
     created_at: datetime=Field(default_factory=lambda:datetime.now(timezone.utc))

@@ -18,7 +18,7 @@ class ProductUpdate(ProductBase):
     
 class ProductRead(ProductBase):
     id:int
-    name: str
+    product_name: str
     description: Optional[str]
     unit_price: float
     stock: int
@@ -30,7 +30,7 @@ class ProductRead(ProductBase):
     
 class ProductMinimalRead(ProductBase):
     id:int
-    name:str
+    product_name:str
     unit_price: float
     stock: int
     is_active:bool
