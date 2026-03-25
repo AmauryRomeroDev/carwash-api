@@ -7,7 +7,7 @@ from app.core.dependencies import get_current_user
 from app.models.comment import Comment
 from app.models.user import User
 from app.models.service import Service
-from app.schemas.comment import CommentCreate, CommentMainResponse
+from app.schemas.comment import CommentCreate, CommentMainResponse, CommentUpdate,CommentReplyResponse
 
 router = APIRouter()
 
@@ -81,3 +81,27 @@ def delete_comment(
     db.delete(comment)
     db.commit()
     return None
+
+@router.patch("/{comment_id}", response_model=CommentMainResponse)
+def update_comment(
+    comment_id: int, 
+    data: CommentUpdate, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    comment = db.query(Comment).filter(Comment.id == comment_id).first()
+    
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comentario no encontrado")
+    
+    # Seguridad: Solo el dueño puede editar
+    if comment.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="No puedes editar un comentario que no es tuyo")
+
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(comment, key, value)
+
+    db.commit()
+    db.refresh(comment)
+    return comment

@@ -1,20 +1,30 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import List
 
 from app.database.connection import get_db
 from app.core.dependencies import RoleChecker, get_current_user
+
 from app.models.user import User
 from app.models.product import Product
 from app.models.order_service import OrderService
 from app.models.order_product import OrderProduct
 from app.models.inventory_movements import InventoryMovement
+from app.models.employee import Employee
 
 # Esquemas
 from app.schemas.inventory_movements import InventoryMovementCreate, InventoryMovementRead
 from app.schemas.order_service import OrderServiceCreate, OrderServiceRead
 from app.schemas.order_product import OrderProductCreate
+from sqlalchemy.orm import joinedload
+
+import enum
+
+class MovementTypeEnum(enum.Enum):
+    IN = "IN"
+    OUT = "OUT"
+    ADJUSTMENT = "ADJUSTMENT"
 
 router = APIRouter()
 
@@ -76,7 +86,7 @@ def add_product_to_order(
         type="out",
         amount=data.amount,
         employee_id=current_user.id,
-        reference_id=data.order_id,
+        order_id=data.order_id,
         note=f"Venta en orden #{data.order_id}"
     )
     
@@ -103,8 +113,27 @@ def manual_inventory_adjust(
             raise HTTPException(status_code=400, detail="No hay suficiente stock para retirar")
         product.stock -= data.amount
 
-    new_move = InventoryMovement(**data.model_dump(exclude={"employee_id"}), employee_id=current_user.id)
+    try:
+        db_type = MovementTypeEnum[data.type.value.upper()]
+    except KeyError:
+        raise HTTPException(status_code=400, detail="Tipo de movimiento no válido")
+
+
+    new_move = InventoryMovement(
+        product_id=data.product_id,
+        employee_id=current_user.id,
+        order_id=data.order_id if data.order_id != 0 else None,
+        type=db_type.value,
+        amount=data.amount,
+        note=data.note
+    )
     db.add(new_move)
     db.commit()
-    db.refresh(new_move)
-    return new_move
+    
+    # CARGA EN CASCADA: Movimiento -> Empleado -> Usuario
+    result = db.query(InventoryMovement).options(
+        joinedload(InventoryMovement.product),
+        joinedload(InventoryMovement.employee).joinedload(Employee.user)
+    ).filter(InventoryMovement.id == new_move.id).first()
+
+    return result

@@ -1,10 +1,13 @@
 # app/api/v1/vehicles.py
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.database.connection import get_db
 from app.core.dependencies import get_current_user
+
 from app.models.vehicle import Vehicle
 from app.models.user import User
+from app.models.client import Client
+
 from app.schemas.vehicle import VehicleCreate, VehicleRead, VehicleUpdate
 
 router = APIRouter()
@@ -35,22 +38,25 @@ def create_vehicle(
         )
 
     # 2. Verificar si la placa ya existe
-    if db.query(Vehicle).filter(Vehicle.license_plate == data.license_plate).first():
+    if db.query(Vehicle).filter(Vehicle.liscence_plate == data.liscence_plate).first():
         raise HTTPException(status_code=400, detail="La placa ya está registrada")
 
     # 3. Crear el vehículo
     new_vehicle = Vehicle(
-        license_plate=data.license_plate,
+        liscence_plate=data.liscence_plate,
         brand=data.brand,
         model=data.model,
         color=data.color,
+        vehicle_type=data.vehicle_type,
         client_id=target_client_id
     )
     
     db.add(new_vehicle)
     db.commit()
     db.refresh(new_vehicle)
-    return new_vehicle
+    return db.query(Vehicle).options(
+        joinedload(Vehicle.client).joinedload(Client.user)
+    ).filter(Vehicle.id == new_vehicle.id).first()
 
 from typing import List
 
@@ -60,7 +66,9 @@ def get_vehicles(
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
-    query = db.query(Vehicle)
+    query = db.query(Vehicle).options(
+        joinedload(Vehicle.client).joinedload(Client.user)
+    )
     
     # Filtro: Si no es admin, solo ve sus propios autos
     is_admin = current_user.type == "employee" and current_user.employee.role == "admin"

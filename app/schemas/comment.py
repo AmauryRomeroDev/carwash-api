@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator,Field
 from datetime import datetime
 from typing import List, Optional
 from .user import UserMinimalRead
@@ -7,7 +7,6 @@ from .service import ServiceMinimalRead
 # Responses
 class CommentReplyResponse(BaseModel):
     author: UserMinimalRead 
-    user_photo: Optional[str]
     content: str
     created_at: datetime
 
@@ -30,7 +29,9 @@ class CommentMainResponse(BaseModel):
     @field_validator('replies', mode='before')
     @classmethod
     def allow_none_as_empty_list(cls, v):
-        return v if v is not None else []
+        if isinstance(v, list):
+            return v
+        return []
 
 # Para crear un comentario nuevo
 class CommentCreate(BaseModel):
@@ -43,3 +44,6 @@ class CommentCreate(BaseModel):
 CommentMainResponse.model_rebuild()
 CommentReplyResponse.model_rebuild()
 
+class CommentUpdate(BaseModel):
+    content: Optional[str] = Field(None, min_length=1)
+    rating: Optional[int] = Field(None, ge=1, le=5)

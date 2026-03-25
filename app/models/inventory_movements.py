@@ -4,9 +4,9 @@ from sqlalchemy.orm import relationship
 from app.database.connection import Base
 
 class MovementType(enum.Enum):
-    IN = "entrada"
-    OUT = "salida"
-    ADJUSTMENT = "ajuste"
+    IN = "IN"
+    OUT = "OUT"
+    ADJUSTMENT = "ADJUSTMENT"
 
 class InventoryMovement(Base):
     __tablename__ = "inventory_movements"
