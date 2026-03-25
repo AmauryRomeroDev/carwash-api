@@ -1,6 +1,7 @@
-from pydantic import BaseModel,EmailStr, Field, ConfigDict
+from pydantic import BaseModel,EmailStr, Field, ConfigDict, AliasChoices, AliasPath
 from typing import Optional, List
 from datetime import datetime, timezone
+
 
 from .service import ServiceMinimalRead
 from .vehicle import VehicleRead
@@ -57,4 +58,19 @@ class OrderServiceMinimalRead(BaseModel):
     discount: Optional[float] = Field(0, ge=0, le=100)
     subtotal: Optional[float] = Field(0, ge=0)
 
+    model_config = ConfigDict(from_attributes=True)
+    
+# Tickets ---------------------
+class ServiceTicketItem(BaseModel):
+    service_name: str = Field(validation_alias=AliasChoices('service_name', AliasPath('service', 'service_name')))
+    vehicle_plate: str = Field(validation_alias=AliasChoices('vehicle_plate', AliasPath('vehicle', 'liscence_plate')))
+    price_base: float
+    discount: float
+    total: float 
+
+class ServiceTicketResponse(BaseModel):
+    casher_name: str
+    created_at: datetime
+    items: List[ServiceTicketItem]
+    grand_total: float
     model_config = ConfigDict(from_attributes=True)
