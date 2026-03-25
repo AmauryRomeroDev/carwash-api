@@ -3,9 +3,9 @@ from app.schemas.order_product import OrderProductCreate, OrderProductRead,Order
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
-from typing import List
+from typing import List, Optional
 from decimal import Decimal
-import enum
+from datetime import datetime, timezone
 
 from app.database.connection import get_db
 from app.core.dependencies import RoleChecker, get_current_user
@@ -19,7 +19,7 @@ from app.models.employee import Employee
 
 
 # Esaquemas
-from app.schemas.order_product import OrderProductCreate
+from app.schemas.order_product import OrderProductCreate,TicketResponse,TicketItemRead
 from sqlalchemy.orm import joinedload
 from app.schemas.inventory_movements import InventoryMovementCreate, InventoryMovementRead
 
@@ -31,7 +31,47 @@ router = APIRouter()
 allow_admin = RoleChecker(["admin"])
 allow_staff = RoleChecker(["admin", "employee"])
 
-# Create order ----------------------------------------
+# get sells -------------------------------------------
+@router.get("/orders/products", response_model=List[OrderProductRead])
+def get_product_sales(
+    product_id: Optional[int] = None, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(allow_staff)
+):
+    """
+    Obtiene el historial de ventas de productos.
+    - Si se envía product_id, filtra solo las ventas de ese producto.
+    - Si no, devuelve todas las ventas registradas.
+    """
+    query = db.query(OrderProduct).options(
+        joinedload(OrderProduct.product),
+        joinedload(OrderProduct.casher).joinedload(Employee.user)
+    )
+    
+    if product_id:
+        query = query.filter(OrderProduct.product_id == product_id)
+    
+    # Ordenar por las más recientes primero
+    return query.order_by(OrderProduct.created_at.desc()).all()
+
+@router.get("/orders/products/{item_id}", response_model=OrderProductRead)
+def get_product_sale_by_id(
+    item_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(allow_staff)
+):
+    """Obtiene el detalle de una venta de producto específica por su ID"""
+    sale = db.query(OrderProduct).options(
+        joinedload(OrderProduct.product),
+        joinedload(OrderProduct.casher).joinedload(Employee.user)
+    ).filter(OrderProduct.id == item_id).first()
+
+    if not sale:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+        
+    return sale
+
+# Create order 1 to 1 ----------------------------------------
 @router.post("/orders/products", response_model=OrderProductRead, status_code=status.HTTP_201_CREATED)
 def create_product_order(
     data: OrderProductCreate, 
@@ -57,8 +97,8 @@ def create_product_order(
         casher_id=current_user.employee.id, # Usamos el ID del perfil de empleado
         amount=data.amount,
         discount=discount,
-        subtotal=subtotal,
-        total=total_final
+        subtotal=total_final,
+        total=subtotal
     )
     
     # 4. Actualizar stock y registrar movimiento (OUT)
@@ -76,6 +116,76 @@ def create_product_order(
     db.commit()
     db.refresh(new_order_item)
     return new_order_item
+
+# Create order Bulk ------------------------
+@router.post("/orders/products/bulk", response_model=TicketResponse)
+def create_bulk_product_sale(
+    items_data: List[OrderProductCreate], # Recibe una lista [{}, {}]
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(allow_staff)
+):
+    if not current_user.employee:
+        raise HTTPException(status_code=400, detail="El usuario no es empleado")
+
+    new_items = []
+    total_ticket = Decimal("0.00")
+
+    # 1. Procesar cada producto solicitado
+    for item in items_data:
+        product = db.query(Product).filter(Product.id == item.product_id).first()
+        
+        # Validar existencia y stock
+        if not product or product.stock < item.amount:
+            db.rollback()
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Stock insuficiente para: {product.name if product else item.product_id}"
+            )
+
+        # 2. Cálculos por producto
+        u_price = Decimal(str(product.unit_price))
+        qty = Decimal(str(item.amount))
+        disc = Decimal(str(item.discount))
+        
+        subtotal = u_price * qty
+        final_price = subtotal - disc
+        total_ticket += final_price
+
+        # 3. Preparar el registro de venta
+        order_item = OrderProduct(
+            product_id=item.product_id,
+            casher_id=current_user.employee.id,
+            amount=item.amount,
+            discount=disc,
+            subtotal=subtotal,
+            total=final_price
+        )
+        
+        # 4. Descontar stock y registrar movimiento (OUT)
+        product.stock -= item.amount
+        movement = InventoryMovement(
+            product_id=product.id,
+            employee_id=current_user.employee.id,
+            type="OUT",
+            amount=item.amount,
+            note="Venta en lote"
+        )
+        
+        db.add(order_item)
+        db.add(movement)
+        new_items.append(order_item)
+
+    db.commit()
+    
+    # 5. Generar la respuesta del Ticket con Joins
+    # Aquí puedes retornar un objeto con el ID del primer item como referencia del ticket
+    return {
+        "ticket_id": new_items[0].id if new_items else 0,
+        "casher_name": f"{current_user.name} {current_user.last_name}",
+        "created_at": datetime.now(),
+        "items": new_items,
+        "grand_total": float(total_ticket)
+    }
 
 # Update order -----------------------------
 @router.patch("/orders/products/{item_id}", response_model=OrderProductRead)
@@ -139,3 +249,49 @@ def delete_product_order(
     db.delete(order_item)
     db.commit()
     return None
+
+# Ticket -------------------------
+
+@router.get("/orders/tickets/{reference_id}", response_model=TicketResponse)
+def get_ticket_detail(
+    reference_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user) 
+):
+    # 1. Consulta optimizada con Joins
+    sales = db.query(OrderProduct).options(
+        joinedload(OrderProduct.product),
+        joinedload(OrderProduct.casher).joinedload(Employee.user)
+    ).filter(OrderProduct.id == reference_id).all() 
+
+    if not sales:
+        raise HTTPException(status_code=404, detail="Ticket o venta no encontrada")
+
+    # 2. Datos del Cajero y Tiempos (Usando el primer registro)
+    first_row = sales[0]
+    casher_info = first_row.casher.user
+    
+    ticket_items = []
+    grand_total = 0.0
+    
+    # 3. Mapeo de items
+    for sale in sales:
+        item = TicketItemRead(
+            product_name=sale.product.product_name,
+            unit_price=float(sale.product.unit_price),
+            amount=sale.amount,
+            discount=float(sale.discount),
+            subtotal=float(sale.subtotal),
+            total=float(sale.total)
+        )
+        ticket_items.append(item)
+        grand_total += float(sale.total)
+
+    # 4. Respuesta estructurada
+    return TicketResponse(
+        ticket_id=reference_id,
+        casher_name=f"{casher_info.name} {casher_info.last_name}",
+        created_at=first_row.created_at,
+        items=ticket_items,
+        grand_total=grand_total
+    )
