@@ -63,8 +63,18 @@ def update_service(
     if not service:
         raise HTTPException(status_code=404, detail="Servicio no encontrado")
 
+    # 1. Extraer solo campos enviados
     update_data = data.model_dump(exclude_unset=True)
+    
     for key, value in update_data.items():
+        # 2. Filtro de limpieza
+        if isinstance(value, str):
+            clean_value = value.strip()
+            # Si mandan "string" o puros espacios, ignoramos este campo específico
+            if clean_value.lower() == "string" or not clean_value:
+                continue
+            value = clean_value
+
         setattr(service, key, value)
 
     db.commit()

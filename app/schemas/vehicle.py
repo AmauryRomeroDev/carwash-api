@@ -17,7 +17,7 @@ class VehicleCreate(VehicleBase):
     pass
 
 class VehicleUpdate(BaseModel):
-    liscence_plate: Optional[str] = Field(None, min_length=17, max_length=20)
+    liscence_plate: Optional[str] = Field(None, max_length=20)
     brand: Optional[str] = Field(None, min_length=1, max_length=50)
     model: Optional[str] = Field(None, min_length=1, max_length=50)
     color: Optional[str] = Field(None, min_length=1, max_length=30)
