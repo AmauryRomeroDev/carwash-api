@@ -1,10 +1,210 @@
-{
-  "id": 1,
-  "name": "Amaury",
-  "last_name": "Romero",
-  "second_last_name": "Martínez",
-  "phone": "7641022230",
-  "email": "amau@example.com",
-  "user_id": 1,
-  "address": "ameles s/n"
-}
+CREATE DATABASE IF NOT EXISTS autolavadodb 
+    CHARACTER SET utf8mb4 
+    COLLATE utf8mb4_unicode_ci;
+
+CREATE USER IF NOT EXISTS 'lavado_app'@'localhost' 
+    IDENTIFIED BY 'pepe1234';
+
+GRANT ALL PRIVILEGES ON autolavadodb.* 
+    TO 'lavado_app'@'localhost';
+
+FLUSH PRIVILEGES;
+
+USE autolavadodb;
+
+-- 1. users
+CREATE TABLE IF NOT EXISTS users (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    name VARCHAR(60) DEFAULT NULL,
+    last_name VARCHAR(60) DEFAULT NULL,
+    second_last_name VARCHAR(60) DEFAULT NULL,
+    phone_number VARCHAR(20) DEFAULT NULL,
+    photo_url VARCHAR(255) DEFAULT NULL,
+    email VARCHAR(120) NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    type VARCHAR(20) DEFAULT NULL,               
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_email (email),
+    KEY idx_phone_number (phone_number),
+    KEY idx_type (type)
+);
+
+-- 2. clients
+CREATE TABLE IF NOT EXISTS clients (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id INT UNSIGNED NOT NULL,
+    address VARCHAR(255) DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_client_user_id (user_id),
+    
+    CONSTRAINT fk_clients_user 
+        FOREIGN KEY (user_id) REFERENCES users(id) 
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 3. vehicles
+CREATE TABLE IF NOT EXISTS vehicles (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    client_id INT UNSIGNED NOT NULL,
+    liscence_plate VARCHAR(20) NOT NULL,          -- ← typo en el modelo, se mantiene como está
+    brand VARCHAR(50) NOT NULL,
+    model VARCHAR(50) NOT NULL,
+    color varchar(20) not null,
+    vehicle_type VARCHAR(50) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_license_plate (liscence_plate),
+    
+    CONSTRAINT fk_vehicles_client 
+        FOREIGN KEY (client_id) REFERENCES clients(id) 
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 4. services
+CREATE TABLE IF NOT EXISTS services (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    service_name VARCHAR(100) NOT NULL,
+    description VARCHAR(100) NOT NULL,
+    total DECIMAL(10,2) NOT NULL,
+    duration_minutes INT NOT NULL,
+    is_active boolean default true,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    PRIMARY KEY (id)
+);
+
+-- 5. order_services  (viene de tu modelo OrderService)
+CREATE TABLE IF NOT EXISTS order_services (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    vehicle_id INT UNSIGNED NOT NULL,
+    client_id INT UNSIGNED NOT NULL,
+    service_id INT UNSIGNED NOT NULL,
+    washer_id INT UNSIGNED NOT NULL,
+    casher_id INT UNSIGNED NOT NULL,
+    delivery_time DATETIME NOT NULL,
+    start_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    completion_time DATETIME DEFAULT NULL,
+    discount DECIMAL(10,2) DEFAULT 0.00,
+    subtotal DECIMAL(10,2) NOT NULL,
+    is_active TINYINT(1) DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    PRIMARY KEY (id),
+    
+    CONSTRAINT fk_os_vehicle   FOREIGN KEY (vehicle_id)   REFERENCES vehicles(id)   ON DELETE CASCADE,
+    CONSTRAINT fk_os_client    FOREIGN KEY (client_id)    REFERENCES clients(id)    ON DELETE CASCADE,
+    CONSTRAINT fk_os_service   FOREIGN KEY (service_id)   REFERENCES services(id)   ON DELETE CASCADE,
+    CONSTRAINT fk_os_washer    FOREIGN KEY (washer_id)    REFERENCES users(id)      ON DELETE CASCADE,
+    CONSTRAINT fk_os_casher    FOREIGN KEY (casher_id)    REFERENCES users(id)      ON DELETE CASCADE
+);
+
+-- 6. products
+CREATE TABLE IF NOT EXISTS products (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    product_name varchar(50) default null,
+    description VARCHAR(255) DEFAULT NULL,
+    unit_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    stock INT NOT NULL DEFAULT 0,
+    is_active boolean not null default true,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    PRIMARY KEY (id)
+);
+
+-- 7. order_products
+CREATE TABLE IF NOT EXISTS order_products (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    product_id INT UNSIGNED NOT NULL,
+    casher_id INT UNSIGNED NOT NULL,
+    amount INT NOT NULL DEFAULT 1,
+    discount DECIMAL(10,2) DEFAULT 0.00,
+    total DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    PRIMARY KEY (id),
+    
+    CONSTRAINT fk_op_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    CONSTRAINT fk_op_casher  FOREIGN KEY (casher_id)  REFERENCES users(id)     ON DELETE CASCADE
+);
+
+-- 8. employees  (viene de tu modelo Employee)
+CREATE TABLE IF NOT EXISTS employees (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id INT UNSIGNED NOT NULL,
+    role VARCHAR(50) NOT NULL,
+    is_active BOOLEAN default true,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_employee_user (user_id),
+    
+    CONSTRAINT fk_employees_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 9. inventory_movements
+CREATE TABLE IF NOT EXISTS inventory_movements (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    product_id INT UNSIGNED NOT NULL,
+    employee_id INT UNSIGNED NOT NULL,
+    order_id INT UNSIGNED DEFAULT NULL,                -- referencia a order_products
+    type ENUM('IN','OUT','ADJUSTMENT') NOT NULL,
+    amount INT NOT NULL DEFAULT 1,
+    note VARCHAR(100) DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    PRIMARY KEY (id),
+    
+    CONSTRAINT fk_im_product  FOREIGN KEY (product_id)  REFERENCES products(id)        ON DELETE CASCADE,
+    CONSTRAINT fk_im_employee FOREIGN KEY (employee_id) REFERENCES employees(id)      ON DELETE CASCADE,
+    CONSTRAINT fk_im_order    FOREIGN KEY (order_id)    REFERENCES order_products(id) ON DELETE CASCADE
+);
+
+-- 10. comments  (viene de tu modelo Comment)
+CREATE TABLE IF NOT EXISTS comments (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    content TEXT NOT NULL,
+    rating INT DEFAULT NULL,
+    author_id INT UNSIGNED NOT NULL,
+    service_id INT UNSIGNED DEFAULT NULL,
+    parent_id INT UNSIGNED DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    PRIMARY KEY (id),
+    
+    CONSTRAINT fk_comments_author  FOREIGN KEY (author_id)  REFERENCES users(id)     ON DELETE CASCADE,
+    CONSTRAINT fk_comments_service FOREIGN KEY (service_id) REFERENCES services(id)  ON DELETE SET NULL,
+    CONSTRAINT fk_comments_parent  FOREIGN KEY (parent_id)  REFERENCES comments(id)  ON DELETE CASCADE
+);
+
+-- Opcional: si quieres mantener user_sessions del DDL original
+CREATE TABLE IF NOT EXISTS user_sessions (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id INT UNSIGNED NOT NULL,
+    token VARCHAR(500) NOT NULL,
+    is_active TINYINT(1) DEFAULT 1,
+    last_login DATETIME not null default current_timestamp,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_session_token (token),
+    
+    CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
