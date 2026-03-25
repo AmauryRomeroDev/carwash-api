@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator, AliasPath
 from typing import Optional
 from datetime import datetime
 from .user import UserBase
@@ -18,7 +18,7 @@ class EmployeeRead(EmployeeBase):
     name: str
     last_name:str
     second_last_name: Optional[str]
-    phone: str
+    phone: Optional[str]
     email: Optional[str]
     is_active: bool
     created_at: datetime=Field(default_factory=lambda:datetime.now())
@@ -26,10 +26,19 @@ class EmployeeRead(EmployeeBase):
 
     model_config = ConfigDict(from_attributes=True)
     
-class EmployeeMinimalRead (EmployeeBase):
+class EmployeeMinimalRead (BaseModel):
     id:int
-    name: Optional[str]
-    last_name: Optional[str]
-    second_last_name: Optional[str]
+    name: str = Field(validation_alias=AliasPath('user', 'name'))
+    last_name: str = Field(validation_alias=AliasPath('user', 'last_name'))
+    role:str
     
     model_config = ConfigDict(from_attributes=True)
+    @field_validator("name", "last_name", mode="before")
+    @classmethod
+    def get_user_attributes(cls, v, info):
+        # Si 'v' es el objeto Employee, buscamos el atributo en su relación 'user'
+        if hasattr(info.data.get("__root__") or v, "user"):
+            user = getattr(v, "user", None)
+            if user:
+                return getattr(user, info.field_name, "N/A")
+        return v

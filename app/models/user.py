@@ -11,6 +11,7 @@ class User(Base):
     last_name = Column(String(60), nullable=True)
     second_last_name = Column(String(60), nullable=True)
     phone_number = Column(String(20), nullable=True, index=True)
+    photo_url=Column(String(200),nullable=True)
     email = Column(String(120), nullable=False, unique=True, index=True)
     password= Column(String(255), nullable=False)   
     type=Column(String(20), nullable=True, index=True)
@@ -21,4 +22,4 @@ class User(Base):
 
     client=relationship("Client", back_populates="user", uselist=False, cascade="all, delete-orphan")
     employee=relationship("Employee", back_populates="user", uselist=False, cascade="all, delete-orphan")
-    
+    comments_written = relationship("Comment", back_populates="author")

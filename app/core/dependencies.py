@@ -1,16 +1,36 @@
-from fastapi import Request, HTTPException, Depends
+#dependences.py
+from fastapi import Request, HTTPException, Depends, status
 from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import Session 
 from app.database.connection import SessionLocal
+from app.models.session import UserSession
 from app.models.user import User
+from fastapi.security import OAuth2PasswordBearer
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
 
 def get_db():
     db = SessionLocal()
     try: yield db
     finally: db.close()
 
-def get_current_user(request: Request, db: SessionLocal = Depends(get_db)):
-    user_id = request.state.user_id # Viene del middleware
-    # Usamos joinedload para traer el perfil
+
+def get_current_user(request: Request, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    user_id = getattr(request.state, "user_id", None) 
+    token = getattr(request.state, "token", None)
+    
+    if not user_id or not token:
+        raise HTTPException(status_code=401, detail="No se encontró información de sesión")
+
+    db_session = db.query(UserSession).filter(
+        UserSession.user_id == user_id,
+        UserSession.token == token,
+        UserSession.is_active == True
+    ).first()
+    
+    if not db_session:
+        raise HTTPException(status_code=401, detail="Sesión inválida o cerrada")
+
     user = db.query(User).options(
         joinedload(User.employee), 
         joinedload(User.client)
@@ -18,7 +38,15 @@ def get_current_user(request: Request, db: SessionLocal = Depends(get_db)):
 
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="La cuenta está desactivada"
+        )
+        
     return user
+
 
 
 class RoleChecker:

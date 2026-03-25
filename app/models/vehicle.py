@@ -11,6 +11,7 @@ class Vehicle(Base):
     liscence_plate = Column(String(20), nullable=False) 
     brand = Column(String(50), nullable=False) 
     model = Column(String(50), nullable=False) 
+    color = Column(String(20), nullable=False)
     vehicle_type = Column(String(50), nullable=False) 
     
     created_at = Column(DateTime, nullable=False, server_default=func.now())

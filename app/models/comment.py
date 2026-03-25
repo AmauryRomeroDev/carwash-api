@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text,func
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship,backref
 from datetime import datetime
 from app.database.connection import Base
 
@@ -22,5 +22,8 @@ class Comment(Base):
 
     # Relaciones 
     author = relationship("User", back_populates="comments_written")
-    service = relationship("Service")
-    replies = relationship("Comment", backref="parent", remote_side=[id])
+    service = relationship("Service")    
+    replies = relationship("Comment", 
+        backref=backref("parent_record", remote_side=[id]), # Cambia 'parent' por 'parent_record'
+        cascade="all, delete-orphan"
+    )

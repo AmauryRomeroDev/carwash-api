@@ -3,7 +3,7 @@ from typing import Optional, List
 from datetime import datetime, timezone
 
 class ProductBase(BaseModel):
-    name: str = Field(...,min_length=1, max_length=100)
+    product_name: str = Field(...,min_length=1, max_length=100)
     description: Optional[str] = Field(None, min_length=1, max_length=500)
     unit_price: float = Field(..., gt=0)
     stock:int
@@ -17,11 +17,12 @@ class ProductUpdate(ProductBase):
     stock: Optional[int] = Field(None, ge=0)
     
 class ProductRead(ProductBase):
-    id: int
-    name: str
+    id:int
+    product_name: str
     description: Optional[str]
     unit_price: float
     stock: int
+    is_active: bool
     created_at: datetime=Field(default_factory=lambda:datetime.now(timezone.utc))
     updated_at: Optional[datetime]=Field(default_factory=lambda:datetime.now(timezone.utc))
 
@@ -29,8 +30,9 @@ class ProductRead(ProductBase):
     
 class ProductMinimalRead(ProductBase):
     id:int
-    name:str
+    product_name:str
     unit_price: float
     stock: int
+    is_active:bool
     
     model_config = ConfigDict(from_attributes=True)

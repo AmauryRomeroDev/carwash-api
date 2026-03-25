@@ -1,11 +1,12 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, field_validator,Field
 from datetime import datetime
 from typing import List, Optional
+from .user import UserMinimalRead
+from .service import ServiceMinimalRead
 
 # Responses
 class CommentReplyResponse(BaseModel):
-    user_name: str
-    user_photo: Optional[str]
+    author: UserMinimalRead 
     content: str
     created_at: datetime
 
@@ -14,17 +15,23 @@ class CommentReplyResponse(BaseModel):
 
 # Principal Comment
 class CommentMainResponse(BaseModel):
-    id: int
-    user_name: str
-    user_photo: Optional[str]
+    id:int
     content: str
-    service_name: str
-    rating: int = Field(ge=1, le=5)
+    rating: Optional[int]
     created_at: datetime
-    replies: List[CommentReplyResponse] = []
+    # Accedemos a las relaciones de SQLAlchemy
+    author: "UserMinimalRead"
+    service: Optional["ServiceMinimalRead"]
+    replies: List["CommentReplyResponse"] = []
 
     class Config:
         from_attributes = True
+    @field_validator('replies', mode='before')
+    @classmethod
+    def allow_none_as_empty_list(cls, v):
+        if isinstance(v, list):
+            return v
+        return []
 
 # Para crear un comentario nuevo
 class CommentCreate(BaseModel):
@@ -32,3 +39,11 @@ class CommentCreate(BaseModel):
     service_id: Optional[int] = None 
     rating: Optional[int] = None    
     parent_id: Optional[int] = None 
+    
+# Al final de app/schemas/comment.py
+CommentMainResponse.model_rebuild()
+CommentReplyResponse.model_rebuild()
+
+class CommentUpdate(BaseModel):
+    content: Optional[str] = Field(None, min_length=1)
+    rating: Optional[int] = Field(None, ge=1, le=5)
