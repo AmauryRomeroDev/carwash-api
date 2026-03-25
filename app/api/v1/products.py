@@ -64,14 +64,22 @@ def update_product(
     if not product:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
+    # 1. Extraer solo campos enviados
     update_data = data.model_dump(exclude_unset=True)
+    
     for key, value in update_data.items():
+        # 2. Filtro de limpieza (evitar sobreescribir con basura)
+        if isinstance(value, str):
+            clean_value = value.strip()
+            if clean_value.lower() == "string" or not clean_value:
+                continue
+            value = clean_value
+
         setattr(product, key, value)
 
     db.commit()
     db.refresh(product)
     return product
-
 
 # --- DELETE (Solo Admin) ---
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -9,7 +9,7 @@ class OrderServiceBase(BaseModel):
     client_id: int
     vehicle_id: int
     service_id: int
-    employee_id:int
+    washer_id:int
     casher_id:int
     delivery_time: Optional[datetime] = None
     notes: Optional[str] = Field(None, max_length=500)
@@ -26,7 +26,7 @@ class OrderServiceUpdate(BaseModel):
     client_id: Optional[int] = Field(None)
     vehicle_id: Optional[int] = Field(None)
     service_id: Optional[int] = Field(None)
-    employee_id: Optional[int] = Field(None)
+    washer_id: Optional[int] = Field(None)
     casher_id: Optional[int] = Field(None)
     delivery_time: Optional[datetime] = None
     notes: Optional[str] = Field(None, max_length=500)
@@ -40,7 +40,6 @@ class OrderServiceRead(OrderServiceBase):
     id: int
     service: ServiceMinimalRead
     delivery_time: Optional[datetime] = None
-    notes: Optional[str] = Field(None, max_length=500)
     start_time: Optional[datetime]=Field(default_factory=lambda:datetime.now(timezone.utc))
     completion_time: Optional[datetime]=Field(default_factory=lambda:datetime.now(timezone.utc))
     discount: Optional[float] = Field(0, ge=0, le=100)

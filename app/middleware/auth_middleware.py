@@ -45,6 +45,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             # 3. Decodificar Token
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             user_id: str = payload.get("sub")
+            request.state.token=token
             
             db = SessionLocal()
             session_db = db.query(UserSession).filter(

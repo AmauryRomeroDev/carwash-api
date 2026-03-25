@@ -33,18 +33,32 @@ def update_own_profile(
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
-    # Convertimos a dict saltando los valores no enviados (unset)
+    # Traemos al objeto a la sesión actual
+    current_user = db.merge(current_user)
+    
+    # Extraemos solo lo que el usuario envió en el JSON
     update_data = data.model_dump(exclude_unset=True)
     
-    if "password" in update_data:
-        update_data["password"] = get_password_hash(update_data["password"])
-    
     for key, value in update_data.items():
+        # 1. Filtro para Strings (Limpiar espacios y evitar el valor por defecto 'string')
+        if isinstance(value, str):
+            clean_value = value.strip()
+            
+            # Si es solo espacios ("  ") o es el texto "string" de Swagger, lo ignoramos
+            if not clean_value or clean_value.lower() == "string":
+                continue
+            value = clean_value
+
+        # 2. Hashing de contraseña (solo si pasó el filtro anterior)
+        if key == "password":
+            value = get_password_hash(value)
+        
         setattr(current_user, key, value)
     
     db.commit()
     db.refresh(current_user)
     return current_user
+
 
 # Delete user (desactivate profile) -----------------
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)

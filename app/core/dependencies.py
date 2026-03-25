@@ -3,6 +3,7 @@ from fastapi import Request, HTTPException, Depends, status
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm import Session 
 from app.database.connection import SessionLocal
+from app.models.session import UserSession
 from app.models.user import User
 from fastapi.security import OAuth2PasswordBearer
 
@@ -16,9 +17,19 @@ def get_db():
 
 def get_current_user(request: Request, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
     user_id = getattr(request.state, "user_id", None) 
+    token = getattr(request.state, "token", None)
     
-    if not user_id:
+    if not user_id or not token:
         raise HTTPException(status_code=401, detail="No se encontró información de sesión")
+
+    db_session = db.query(UserSession).filter(
+        UserSession.user_id == user_id,
+        UserSession.token == token,
+        UserSession.is_active == True
+    ).first()
+    
+    if not db_session:
+        raise HTTPException(status_code=401, detail="Sesión inválida o cerrada")
 
     user = db.query(User).options(
         joinedload(User.employee), 
