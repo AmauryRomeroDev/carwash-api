@@ -86,7 +86,7 @@ class ServiceTicketItem(BaseModel):
 
 class ServiceTicketResponse(BaseModel):
     casher_name: str
-    client_name: Optional[str]
+    client_name: str
     created_at: datetime
     items: List[ServiceTicketItem]
     grand_total: float

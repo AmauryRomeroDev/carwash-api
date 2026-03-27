@@ -8,16 +8,17 @@ from .product import ProductMinimalRead
 class OrderProductBase(BaseModel):
     ticket_id:int
     product_id: int
+    client_id: int
     casher_id:int
     amount: int
     total:float
-    discount: Optional[float] = Field(0.0, ge=0.0, le=100.0)
     subtotal:float
     
 class OrderProductCreate(OrderProductBase):
     pass
 
 class OrderProductUpdate(OrderProductBase):
+    client_id: Optional[int]
     amount: int
     total:float
     discount: Optional[float] = Field(..., ge=0.0, le=100.0)
@@ -25,11 +26,11 @@ class OrderProductUpdate(OrderProductBase):
     
 class OrderProductRead(OrderProductBase):
     ticket_id: int
+    client_id: Optional[int]
     product: ProductMinimalRead
     casher:EmployeeMinimalRead
     amount: int
     total:float
-    discount: Optional[float] = Field(0.0, ge=0.0, le=100.0)
     created_at: datetime=Field(default_factory=lambda:datetime.now(timezone.utc))
     updated_at: Optional[datetime]=Field(default_factory=lambda:datetime.now(timezone.utc))
 
@@ -45,7 +46,6 @@ class OrderProductMinimalRead(OrderProductBase):
     model_config= ConfigDict(from_attributes=True)
     
 # Tickets --------------------------
-# app/schemas/order_product.py
 
 class TicketItemRead(BaseModel):
     product_name: str = Field(
@@ -63,6 +63,7 @@ class TicketItemRead(BaseModel):
 class TicketResponse(BaseModel):
     ticket_id: int
     casher_name: str
+    client_name: str
     created_at: datetime
     items: List[TicketItemRead]
     grand_total: float
