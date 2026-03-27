@@ -7,6 +7,7 @@ from .service import ServiceMinimalRead
 from .vehicle import VehicleRead
 
 class OrderServiceBase(BaseModel):
+    ticket_id: int
     client_id: int
     vehicle_id: int
     service_id: int
@@ -16,7 +17,6 @@ class OrderServiceBase(BaseModel):
     notes: Optional[str] = Field(None, max_length=500)
     start_time: Optional[datetime]=Field(default_factory=lambda:datetime.now(timezone.utc))
     completion_time: Optional[datetime]=Field(default_factory=lambda:datetime.now(timezone.utc))
-    discount: Optional[float] = Field(0, ge=0, le=100)
     subtotal: Optional[float] = Field(0, ge=0)
     is_active: bool = True
     
@@ -24,26 +24,29 @@ class OrderServiceCreate(OrderServiceBase):
     pass
 
 class OrderServiceUpdate(BaseModel):
+    ticket_id: Optional[int]= Field(None)
     client_id: Optional[int] = Field(None)
     vehicle_id: Optional[int] = Field(None)
     service_id: Optional[int] = Field(None)
     washer_id: Optional[int] = Field(None)
     casher_id: Optional[int] = Field(None)
     delivery_time: Optional[datetime] = None
-    notes: Optional[str] = Field(None, max_length=500)
+    notes: Optional[str] = Field(None, max_length=50)
     start_time: Optional[datetime]=Field(default_factory=lambda:datetime.now(timezone.utc))
     completion_time: Optional[datetime]=Field(default_factory=lambda:datetime.now(timezone.utc))
-    discount: Optional[float] = Field(0, ge=0, le=100)
     subtotal: Optional[float] = Field(0, ge=0)
     is_active: Optional[bool] = None
 
 class OrderServiceRead(OrderServiceBase):
     id: int
+    ticket_id: Optional[int]
+    washer_id: Optional[int] = Field(None)
+    casher_id: Optional[int] = Field(None)
     service: ServiceMinimalRead
     delivery_time: Optional[datetime] = None
+    notes: Optional[str]
     start_time: Optional[datetime]=Field(default_factory=lambda:datetime.now(timezone.utc))
     completion_time: Optional[datetime]=Field(default_factory=lambda:datetime.now(timezone.utc))
-    discount: Optional[float] = Field(0, ge=0, le=100)
     subtotal: Optional[float] = Field(0, ge=0)
     created_at: datetime=Field(default_factory=lambda:datetime.now(timezone.utc))
     updated_at: datetime=Field(default_factory=lambda:datetime.now(timezone.utc))
@@ -52,24 +55,38 @@ class OrderServiceRead(OrderServiceBase):
     
 class OrderServiceMinimalRead(BaseModel):
     id: int
+    ticket_id: Optional[int]= Field(None)
+    washer_id: Optional[int] = Field(None)
+    casher_id: Optional[int] = Field(None)
     service: ServiceMinimalRead
     delivery_time: Optional[datetime] = None
     notes: Optional[str] = Field(None, max_length=500)
-    discount: Optional[float] = Field(0, ge=0, le=100)
     subtotal: Optional[float] = Field(0, ge=0)
 
     model_config = ConfigDict(from_attributes=True)
     
 # Tickets ---------------------
 class ServiceTicketItem(BaseModel):
-    service_name: str = Field(validation_alias=AliasChoices('service_name', AliasPath('service', 'service_name')))
-    vehicle_plate: str = Field(validation_alias=AliasChoices('vehicle_plate', AliasPath('vehicle', 'liscence_plate')))
-    price_base: float
-    discount: float
-    total: float 
+    service_name: str = Field(
+        validation_alias=AliasChoices('service_name', AliasPath('service', 'service_name'))
+    )
+    price_base: float = Field(
+        validation_alias=AliasChoices('price_base', AliasPath('service', 'price'))
+    )
+    discount: float = Field(
+        validation_alias=AliasChoices(AliasPath('service', 'discount'), 'discount'),
+        default=0.0
+    )
+    total: float = Field(
+        validation_alias=AliasChoices('total', 'subtotal')
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
 
 class ServiceTicketResponse(BaseModel):
     casher_name: str
+    client_name: Optional[str]
     created_at: datetime
     items: List[ServiceTicketItem]
     grand_total: float

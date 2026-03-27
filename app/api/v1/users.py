@@ -1,5 +1,5 @@
 # app/api/v1/users.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.database.connection import get_db
 from app.core.dependencies import get_current_user, RoleChecker
@@ -60,20 +60,6 @@ def update_own_profile(
     return current_user
 
 
-# Delete user (desactivate profile) -----------------
-@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
-def deactivate_my_account(
-    db: Session = Depends(get_db), 
-    current_user: User = Depends(get_current_user)
-):
-    # Borrado lógico
-    current_user.is_active = False
-
-    db.commit()
-    
-
-    return None
-
 # Delete for admin ------------
 allow_admin = RoleChecker(["admin"])
 
@@ -91,10 +77,49 @@ def deactivate_user(
     db.commit()
     return None
 
+# Logout -----------------------------------------------------
 @router.post("/logout")
-def logout(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
-    session = db.query(UserSession).filter(UserSession.user_id == current_user.id).first()
+def logout(
+    request: Request, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    # Usamos el token que el middleware inyectó en request.state
+    token = getattr(request.state, "token", None)
+
+    session = db.query(UserSession).filter(
+        UserSession.user_id == current_user.id,
+        UserSession.token == token,
+        UserSession.is_active == True
+    ).first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada o ya cerrada")
+
+    session.is_active = False
+    db.commit()
+    return {"detail": "Sesión cerrada exitosamente"}
+
+# Delete user (desactivate profile) -----------------
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+def deactivate_my_account(
+    request: Request,
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    # 1. Traemos al objeto a la sesión actual
+    current_user = db.merge(current_user)
+    current_user.is_active = False
+
+    # 2. También cerramos su sesión actual para que sea expulsado inmediatamente
+    token = getattr(request.state, "token", None)
+    session = db.query(UserSession).filter(
+        UserSession.user_id == current_user.id,
+        UserSession.token == token
+    ).first()
+    
     if session:
         session.is_active = False
-        db.commit()
-    return {"detail": "Sesión cerrada correctamente"}
+
+    db.commit()
+    return None

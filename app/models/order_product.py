@@ -21,11 +21,10 @@ class OrderProduct(Base):
         Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False
     )
     casher_id = Column(
-        Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False
+        Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=True
     )
-
+    ticket_id= Column(Integer, nullable=False)
     amount = Column(Integer, nullable=False, default=1)
-    discount = Column(DECIMAL(10, 2), default=0.00)
     total = Column(DECIMAL(10, 2), nullable=False, default=0.00)
     subtotal = Column(DECIMAL(10, 2), nullable=False, default=0.00)
 

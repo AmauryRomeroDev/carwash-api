@@ -10,16 +10,17 @@ class OrderService(Base):
     vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False)
     client_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     service_id = Column(Integer, ForeignKey("services.id", ondelete="CASCADE"), nullable=False)
+    ticket_id=Column(Integer, nullable=False)
     
     # Empleados (Ambos apuntan a la tabla 'employees')
-    washer_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False)
-    casher_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False)
+    washer_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=True)
+    casher_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=True)
     
     delivery_time = Column(DateTime, nullable=False)
+    notes= Column(String, nullable=True)
     start_time = Column(DateTime, nullable=True, server_default=func.now())
     completion_time = Column(DateTime, nullable=True)
     
-    discount = Column(DECIMAL(10, 2), default=0.00)
     subtotal = Column(DECIMAL(10, 2), nullable=False)
     is_active = Column(Boolean, default=True)
     

@@ -6,6 +6,7 @@ from .employee import EmployeeMinimalRead
 from .product import ProductMinimalRead
 
 class OrderProductBase(BaseModel):
+    ticket_id:int
     product_id: int
     casher_id:int
     amount: int
@@ -23,6 +24,7 @@ class OrderProductUpdate(OrderProductBase):
     subtotal:float
     
 class OrderProductRead(OrderProductBase):
+    ticket_id: int
     product: ProductMinimalRead
     casher:EmployeeMinimalRead
     amount: int

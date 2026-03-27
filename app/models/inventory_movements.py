@@ -14,7 +14,7 @@ class InventoryMovement(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
-    employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False)
+    employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=True)
     order_id = Column(Integer, ForeignKey("order_products.id", ondelete="CASCADE"), nullable=True)
 
     # Uso correcto de Enum en SQLAlchemy
