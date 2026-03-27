@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS vehicles (
     model VARCHAR(50) NOT NULL,
     color varchar(20) not null,
     vehicle_type VARCHAR(50) NOT NULL,
+    is_temporary boolean default false,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
@@ -76,6 +77,8 @@ CREATE TABLE IF NOT EXISTS services (
     description VARCHAR(100) NOT NULL,
     total DECIMAL(10,2) NOT NULL,
     duration_minutes INT NOT NULL,
+    discount int ,
+    has_discount boolean default false,
     is_active boolean default true,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -87,14 +90,15 @@ CREATE TABLE IF NOT EXISTS services (
 CREATE TABLE IF NOT EXISTS order_services (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     vehicle_id INT UNSIGNED NOT NULL,
-    client_id INT UNSIGNED NOT NULL,
+    client_id INT UNSIGNED ,
     service_id INT UNSIGNED NOT NULL,
-    washer_id INT UNSIGNED NOT NULL,
-    casher_id INT UNSIGNED NOT NULL,
+    washer_id INT UNSIGNED ,
+    casher_id INT UNSIGNED ,
+    ticket_id int unsigned  not null,
     delivery_time DATETIME NOT NULL,
+    notes varchar(50),
     start_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     completion_time DATETIME DEFAULT NULL,
-    discount DECIMAL(10,2) DEFAULT 0.00,
     subtotal DECIMAL(10,2) NOT NULL,
     is_active TINYINT(1) DEFAULT 1,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -116,6 +120,8 @@ CREATE TABLE IF NOT EXISTS products (
     description VARCHAR(255) DEFAULT NULL,
     unit_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     stock INT NOT NULL DEFAULT 0,
+    discount int ,
+    has_discount boolean default false,
     is_active boolean not null default true,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -127,9 +133,10 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE TABLE IF NOT EXISTS order_products (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     product_id INT UNSIGNED NOT NULL,
-    casher_id INT UNSIGNED NOT NULL,
+    client_id INT UNSIGNED NOT NULL,
+    casher_id INT UNSIGNED ,
+    ticket_id int unsigned not null,
     amount INT NOT NULL DEFAULT 1,
-    discount DECIMAL(10,2) DEFAULT 0.00,
     total DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -138,7 +145,8 @@ CREATE TABLE IF NOT EXISTS order_products (
     PRIMARY KEY (id),
     
     CONSTRAINT fk_op_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-    CONSTRAINT fk_op_casher  FOREIGN KEY (casher_id)  REFERENCES users(id)     ON DELETE CASCADE
+    CONSTRAINT fk_op_casher  FOREIGN KEY (casher_id)  REFERENCES users(id)     ON DELETE CASCADE,
+	CONSTRAINT fk_op_client FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- 8. employees  (viene de tu modelo Employee)
@@ -208,3 +216,14 @@ CREATE TABLE IF NOT EXISTS user_sessions (
     
     CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- Permitir que estos campos sean nulos para ventas online o sin asignar
+ALTER TABLE order_services MODIFY COLUMN casher_id INT unsigned NULL;
+ALTER TABLE order_services MODIFY COLUMN washer_id INT unsigned NULL;
+ALTER TABLE order_services MODIFY COLUMN client_id INT unsigned NULL;
+ALTER TABLE order_services modify COLUMN notes TEXT NULL;
+
+SET FOREIGN_KEY_CHECKS = 1;
