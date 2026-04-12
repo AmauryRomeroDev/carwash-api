@@ -8,6 +8,8 @@ class ServiceBase(BaseModel):
     description: Optional[str] = Field(None, min_length=5, max_length=200)
     price: Decimal = Field(..., ge=0, max_digits=10, decimal_places=2)
     duration_minutes: int = Field(..., ge=1)
+    discount: int
+    has_discount: bool
 
 class ServiceCreate(ServiceBase):
     pass
@@ -17,12 +19,15 @@ class ServiceUpdate(ServiceBase):
     description: Optional[str] = Field(None, min_length=5, max_length=200)
     price: Optional[Decimal] = Field(..., ge=0, max_digits=10, decimal_places=2)
     duration_minutes: Optional[int] = Field(None, ge=1)
+    discount: int
+    has_discount: bool
     
 class ServiceRead(ServiceBase):
     id: int
     price: Decimal = Field(..., ge=0, max_digits=10, decimal_places=2)
     description: Optional[str] = Field(None, min_length=5, max_length=200)
     duration_minutes: int = Field(..., ge=1)
+    discount: int
     is_active: bool
     created_at: datetime=Field(default_factory=lambda:datetime.now(timezone.utc))
     updated_at: Optional[datetime]=Field(default_factory=lambda:datetime.now(timezone.utc))
@@ -33,5 +38,6 @@ class ServiceMinimalRead(BaseModel):
     id: int
     service_name: str
     price: Decimal = Field(..., ge=0, max_digits=10, decimal_places=2)
+    discount: int
 
     model_config = ConfigDict(from_attributes=True)

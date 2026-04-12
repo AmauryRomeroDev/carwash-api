@@ -19,45 +19,63 @@ def create_vehicle(
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
-    # 1. Determinar el client_id final
+    # 1. Determinar el client_id final según el rol
     target_client_id = None
 
-    # Si es Administrador, usa el client_id que viene en el JSON
-    if current_user.type == "employee" and current_user.employee.role == "admin":
+    # CASO: EMPLEADO (ADMIN)
+    if current_user.type == "employee":
+        if not current_user.employee or current_user.employee.role != "admin":
+            raise HTTPException(status_code=403, detail="No tienes permisos de administrador")
+        
+        # Validación específica para Admin: No puede ser 0 o None
+        if not data.client_id or data.client_id == 0:
+            raise HTTPException(status_code=400, detail="Como Admin, debes especificar un ID de cliente válido (distinto de 0)")
+        
         target_client_id = data.client_id
     
-    # Si es Cliente, forzamos que el auto sea para ÉL mismo
+    # CASO: CLIENTE
     elif current_user.type == "client":
         if not current_user.client:
-            raise HTTPException(status_code=400, detail="Perfil de cliente no encontrado")
+            raise HTTPException(status_code=400, detail="Tu perfil de cliente no existe en la base de datos")
         target_client_id = current_user.client.id
     
     else:
-        raise HTTPException(
-            status_code=403, 
-            detail="No tienes permiso para registrar vehículos"
-        )
+        raise HTTPException(status_code=403, detail="Tipo de usuario no autorizado")
 
-    # 2. Verificar si la placa ya existe
+    # Validación final de seguridad
+    if not target_client_id:
+        raise HTTPException(status_code=400, detail="No se pudo determinar el ID del cliente")
+
+    # 2. Verificar si la placa ya existe (Case Insensitive opcional)
     if db.query(Vehicle).filter(Vehicle.liscence_plate == data.liscence_plate).first():
         raise HTTPException(status_code=400, detail="La placa ya está registrada")
 
-    # 3. Crear el vehículo
-    new_vehicle = Vehicle(
-        liscence_plate=data.liscence_plate,
-        brand=data.brand,
-        model=data.model,
-        color=data.color,
-        vehicle_type=data.vehicle_type,
-        client_id=target_client_id
-    )
-    
-    db.add(new_vehicle)
-    db.commit()
-    db.refresh(new_vehicle)
-    return db.query(Vehicle).options(
+    # 3. Crear e Insertar
+    try:
+        new_vehicle = Vehicle(
+            liscence_plate=data.liscence_plate,
+            brand=data.brand,
+            model=data.model,
+            color=data.color,
+            vehicle_type=data.vehicle_type,
+            client_id=target_client_id
+        )
+        db.add(new_vehicle)
+        db.commit()
+        db.refresh(new_vehicle) # Aquí ya obtenemos el ID generado
+    except Exception as e:
+        db.rollback()
+        print(f"DEBUG ERROR DB: {e}")
+        raise HTTPException(status_code=500, detail="Error de integridad al guardar el vehículo")
+
+    # 4. Retornar con las relaciones cargadas (Joinedload)
+    # Buscamos el objeto recién creado para incluir los datos del Cliente y Usuario
+    result = db.query(Vehicle).options(
         joinedload(Vehicle.client).joinedload(Client.user)
     ).filter(Vehicle.id == new_vehicle.id).first()
+
+    return result
+
 
 
 # Read client vehicles ------------------

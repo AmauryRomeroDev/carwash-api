@@ -10,6 +10,9 @@ class Product(Base):
     unit_price=Column(DECIMAL(10,2),nullable=False,default=0.00)
     stock=Column(Integer, nullable=False, default=0)
     
+    discount= Column(Integer, default=0)
+    has_discount= Column(Boolean, default=False)
+    
     is_active=Column(Boolean,nullable=False,default=True)
     
     created_at = Column(DateTime, nullable=False, server_default=func.now())

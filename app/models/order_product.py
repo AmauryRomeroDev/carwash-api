@@ -21,11 +21,13 @@ class OrderProduct(Base):
         Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False
     )
     casher_id = Column(
-        Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False
+        Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=True
     )
-
+    client_id=Column(
+        Integer, ForeignKey("clients.id", ondelete="CASCADE"), nullable=True
+    )
+    ticket_id= Column(Integer, nullable=False)
     amount = Column(Integer, nullable=False, default=1)
-    discount = Column(DECIMAL(10, 2), default=0.00)
     total = Column(DECIMAL(10, 2), nullable=False, default=0.00)
     subtotal = Column(DECIMAL(10, 2), nullable=False, default=0.00)
 
@@ -37,3 +39,4 @@ class OrderProduct(Base):
     # Relaciones
     product = relationship("Product", back_populates="orders")
     casher = relationship("Employee", foreign_keys=[casher_id])
+    client = relationship("Client", back_populates="product_orders" )

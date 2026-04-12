@@ -11,6 +11,7 @@ class VehicleBase(BaseModel):
     model: str = Field(...,min_length=3, max_length=50)
     color: Optional[str] = Field(None, min_length=1, max_length=30)
     vehicle_type:str=Field(...,min_length=5, max_length=30)
+    is_temporary: bool 
     client_id: Optional[int]=None
     
 class VehicleCreate(VehicleBase):
@@ -22,6 +23,7 @@ class VehicleUpdate(BaseModel):
     model: Optional[str] = Field(None, min_length=1, max_length=50)
     color: Optional[str] = Field(None, min_length=1, max_length=30)
     vehcicle_type:Optional[str]= Field(None, min_length=1, max_length=30)
+    is_temporary: Optional[bool] 
     
     
 class VehicleRead(VehicleBase):

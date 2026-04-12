@@ -51,7 +51,7 @@ def create_comment(
     return new_comment
 
 
-# --- READ (Público: Ver todos los comentarios principales con sus respuestas) ---
+# --- Read all comments ---
 @router.get("/", response_model=List[CommentMainResponse])
 def get_comments(db: Session = Depends(get_db)):
     """Obtiene los comentarios principales (sin padre) y sus respuestas"""
@@ -59,29 +59,55 @@ def get_comments(db: Session = Depends(get_db)):
         joinedload(Comment.author),
         joinedload(Comment.service),
         joinedload(Comment.replies).joinedload(Comment.author)
-    ).filter(Comment.parent_id == None).all() # Solo comentarios raíz
+    ).filter(Comment.parent_id == None).all() 
     
     return comments
 
-# --- DELETE (Dueño del comentario o Admin) ---
-@router.delete("/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_comment(
-    comment_id: int, 
+# --- Read only me comments --------------
+@router.get("/me", response_model=List[CommentMainResponse])
+def get_my_comments(
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
-    comment = db.query(Comment).filter(Comment.id == comment_id).first()
+    """Obtiene los comentarios principales creados por el usuario actual"""
+    my_comments = db.query(Comment).options(
+        joinedload(Comment.author),
+        joinedload(Comment.service),
+        joinedload(Comment.replies).joinedload(Comment.author)
+    ).filter(
+        Comment.author_id == current_user.id,  # Filtro por tu ID
+        Comment.parent_id == None               # Solo comentarios raíz
+    ).all()
+    
+    return my_comments
+
+# get comment by id ---------------------
+@router.get("/{comment_id}", response_model=CommentMainResponse)
+def get_comment_by_id(
+    comment_id: int, 
+    db: Session = Depends(get_db)
+):
+    """
+    Obtiene un comentario por su ID. 
+    Útil para cargar el comentario padre antes de responder.
+    """
+    comment = db.query(Comment).options(
+        joinedload(Comment.author),
+        joinedload(Comment.service),
+        joinedload(Comment.replies).joinedload(Comment.author)
+    ).filter(Comment.id == comment_id).first()
+
     if not comment:
-        raise HTTPException(status_code=404, detail="Comentario no encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail=f"El comentario con ID {comment_id} no existe"
+        )
+    
+    return comment
 
-    is_admin = current_user.type == "employee" and current_user.employee.role == "admin"
-    if not is_admin and comment.author_id != current_user.id:
-        raise HTTPException(status_code=403, detail="No puedes borrar este comentario")
 
-    db.delete(comment)
-    db.commit()
-    return None
 
+# Update comment -----------------
 @router.patch("/{comment_id}", response_model=CommentMainResponse)
 def update_comment(
     comment_id: int, 
@@ -105,3 +131,4 @@ def update_comment(
     db.commit()
     db.refresh(comment)
     return comment
+
