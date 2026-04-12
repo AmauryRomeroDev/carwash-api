@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { User, Mail, Phone, MapPin, Settings, LogOut, Bell, HelpCircle, Shield, ChevronRight, Star, ShoppingBag } from "lucide-react";
+import { User, Mail, Phone, MapPin, Settings, LogOut, Bell, HelpCircle, Shield, ChevronRight, Star, ShoppingBag, Car } from "lucide-react";
 import { motion } from "motion/react";
 import { BottomNav } from "./BottomNav";
 import { TopNav } from "./TopNav";
@@ -35,8 +35,10 @@ export function Profile() {
   };
 
   const quickActions = [
+    { icon: Car, label: "Mis Vehículos", path: "/vehicles", color: "text-blue-600", bg: "bg-blue-50" },
     { icon: Star, label: "Mis Reseñas", path: "/reviews", color: "text-yellow-600", bg: "bg-yellow-50" },
     { icon: ShoppingBag, label: "Productos", path: "/products", color: "text-green-600", bg: "bg-green-50" },
+    { icon: Shield, label: "Panel Admin", path: "/admin", color: "text-purple-600", bg: "bg-purple-50" },
   ];
 
   const menuItems = [

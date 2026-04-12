@@ -10,7 +10,15 @@ import { Booking } from "./components/Booking";
 import { Profile } from "./components/Profile";
 import { Reviews } from "./components/Reviews";
 import { Products } from "./components/Products";
+import { Vehicles } from "./components/Vehicles";
 import { NotFound } from "./components/NotFound";
+import { AdminLayout } from "./components/admin/AdminLayout";
+import { AdminDashboard } from "./pages/admin/AdminDashboard";
+import { AdminStaff } from "./pages/admin/AdminStaff";
+import { AdminInventory } from "./pages/admin/AdminInventory";
+import { AdminProducts } from "./pages/admin/AdminProducts";
+import { AdminServices } from "./pages/admin/AdminServices";
+import { AdminComments } from "./pages/admin/AdminComments";
 
 export const router = createBrowserRouter([
   {
@@ -27,7 +35,20 @@ export const router = createBrowserRouter([
       { path: "profile", Component: Profile },
       { path: "reviews", Component: Reviews },
       { path: "products", Component: Products },
+      { path: "vehicles", Component: Vehicles },
       { path: "*", Component: NotFound },
+    ],
+  },
+  {
+    path: "/admin",
+    Component: AdminLayout,
+    children: [
+      { index: true, Component: AdminDashboard },
+      { path: "staff", Component: AdminStaff },
+      { path: "inventory", Component: AdminInventory },
+      { path: "products", Component: AdminProducts },
+      { path: "services", Component: AdminServices },
+      { path: "comments", Component: AdminComments },
     ],
   },
 ]);
