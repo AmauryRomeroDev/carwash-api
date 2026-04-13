@@ -5,10 +5,34 @@ import { motion } from "motion/react";
 import { BottomNav } from "./BottomNav";
 import { TopNav } from "./TopNav";
 
+interface UserData {
+  id: number;
+  name: string;
+  last_name?: string;
+  second_last_name?: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  photo_url?: string;
+  type: string;
+  role?: string;
+}
+
 export function EditProfile() {
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState({
     name: "",
+    last_name: "",
+    second_last_name: "",
+    email: "",
+    phone: "",
+    address: "",
+  });
+  const [originalData, setOriginalData] = useState({
+    name: "",
+    last_name: "",
+    second_last_name: "",
     email: "",
     phone: "",
     address: "",
@@ -16,31 +40,69 @@ export function EditProfile() {
 
   const [errors, setErrors] = useState({
     name: "",
+    last_name: "",
     email: "",
     phone: "",
   });
 
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const isAuth = localStorage.getItem("isAuthenticated");
-    if (!isAuth) {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
       navigate("/");
       return;
     }
-
-    setFormData({
-      name: localStorage.getItem("userName") || "",
-      email: localStorage.getItem("userEmail") || "",
-      phone: localStorage.getItem("userPhone") || "",
-      address: localStorage.getItem("userAddress") || "",
-    });
+    fetchUserData();
   }, [navigate]);
+
+  const fetchUserData = async () => {
+    const token = localStorage.getItem("access_token");
+
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/users/me", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.clear();
+          navigate("/");
+          return;
+        }
+        throw new Error("Error al obtener datos del usuario");
+      }
+
+      const data: UserData = await response.json();
+      
+      // Separar el nombre completo en nombre y apellidos si es necesario
+      const nameParts = data.name?.split(" ") || [];
+      const userFormData = {
+        name: nameParts[0] || "",
+        last_name: data.last_name || (nameParts[1] || ""),
+        second_last_name: data.second_last_name || (nameParts[2] || ""),
+        email: data.email || "",
+        phone: data.phone || "",
+        address: data.address || "",
+      };
+      
+      setFormData(userFormData);
+      setOriginalData(userFormData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error de conexión");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const validateForm = () => {
     const newErrors = {
       name: "",
+      last_name: "",
       email: "",
       phone: "",
     };
@@ -69,30 +131,89 @@ export function EditProfile() {
     return isValid;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const hasChanges = () => {
+    return (
+      formData.name !== originalData.name ||
+      formData.last_name !== originalData.last_name ||
+      formData.second_last_name !== originalData.second_last_name ||
+      formData.email !== originalData.email ||
+      formData.phone !== originalData.phone ||
+      formData.address !== originalData.address
+    );
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validateForm()) {
       return;
     }
 
+    if (!hasChanges()) {
+      navigate("/profile");
+      return;
+    }
+
     setIsSaving(true);
+    setError("");
 
-    // Simulate API call
-    setTimeout(() => {
-      localStorage.setItem("userName", formData.name);
-      localStorage.setItem("userEmail", formData.email);
-      localStorage.setItem("userPhone", formData.phone);
-      localStorage.setItem("userAddress", formData.address);
+    const token = localStorage.getItem("access_token");
 
-      setIsSaving(false);
+    try {
+      // Preparar los datos en el formato esperado por el backend
+      const updateData: any = {
+        name: formData.name,
+        last_name: formData.last_name,
+        second_last_name: formData.second_last_name,
+        email: formData.email,
+        phone: formData.phone,
+        type: "client", // Tipo fijo para clientes
+      };
+
+      // Solo incluir address si tiene valor
+      if (formData.address) {
+        updateData.address = formData.address;
+      }
+
+      const response = await fetch("http://localhost:8000/api/v1/users/me", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Error al actualizar el perfil");
+      }
+
+      const updatedUser = await response.json();
+      
+      // Actualizar datos locales
+      const updatedFormData = {
+        name: updatedUser.name || "",
+        last_name: updatedUser.last_name || "",
+        second_last_name: updatedUser.second_last_name || "",
+        email: updatedUser.email || "",
+        phone: updatedUser.phone || "",
+        address: updatedUser.address || "",
+      };
+      setFormData(updatedFormData);
+      setOriginalData(updatedFormData);
+
       setShowSuccess(true);
 
       setTimeout(() => {
         setShowSuccess(false);
         navigate("/profile");
       }, 1500);
-    }, 800);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error de conexión");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -110,10 +231,26 @@ export function EditProfile() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <>
+        <div className="hidden lg:block sticky top-0 z-50">
+          <TopNav />
+        </div>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Cargando perfil...</p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       {/* Top Navigation - Desktop Only */}
-      <div className="hidden lg:block">
+      <div className="hidden lg:block sticky top-0 z-50">
         <TopNav />
       </div>
 
@@ -156,11 +293,17 @@ export function EditProfile() {
               animate={{ opacity: 1, y: 0 }}
               className="bg-white rounded-2xl shadow-lg p-6"
             >
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm">
+                  {error}
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Name Field */}
+                {/* Name Fields */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nombre Completo *
+                    Nombre *
                   </label>
                   <div className="relative">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -171,11 +314,45 @@ export function EditProfile() {
                       onChange={handleChange}
                       className={`w-full pl-12 pr-4 py-3 border ${
                         errors.name ? "border-red-500" : "border-gray-300"
-                      } rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                      placeholder="Tu nombre completo"
+                      } rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all`}
+                      placeholder="Tu nombre"
                     />
                   </div>
                   {errors.name && <p className="mt-1 text-sm text-red-500">{errors.name}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Apellido Paterno
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      type="text"
+                      name="last_name"
+                      value={formData.last_name}
+                      onChange={handleChange}
+                      className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                      placeholder="Apellido paterno"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Apellido Materno
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      type="text"
+                      name="second_last_name"
+                      value={formData.second_last_name}
+                      onChange={handleChange}
+                      className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                      placeholder="Apellido materno"
+                    />
+                  </div>
                 </div>
 
                 {/* Email Field */}
@@ -192,7 +369,7 @@ export function EditProfile() {
                       onChange={handleChange}
                       className={`w-full pl-12 pr-4 py-3 border ${
                         errors.email ? "border-red-500" : "border-gray-300"
-                      } rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                      } rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all`}
                       placeholder="tu@email.com"
                     />
                   </div>
@@ -213,8 +390,8 @@ export function EditProfile() {
                       onChange={handleChange}
                       className={`w-full pl-12 pr-4 py-3 border ${
                         errors.phone ? "border-red-500" : "border-gray-300"
-                      } rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                      placeholder="+1 (555) 123-4567"
+                      } rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all`}
+                      placeholder="(555) 123-4567"
                     />
                   </div>
                   {errors.phone && <p className="mt-1 text-sm text-red-500">{errors.phone}</p>}
@@ -232,7 +409,7 @@ export function EditProfile() {
                       value={formData.address}
                       onChange={handleChange}
                       rows={3}
-                      className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                      className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none transition-all"
                       placeholder="Tu dirección (opcional)"
                     />
                   </div>
@@ -277,12 +454,18 @@ export function EditProfile() {
               animate={{ opacity: 1, y: 0 }}
               className="bg-white rounded-2xl shadow-lg p-8"
             >
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm">
+                  {error}
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-3 gap-6">
                   {/* Name Field */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Nombre Completo *
+                      Nombre *
                     </label>
                     <div className="relative">
                       <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -293,33 +476,69 @@ export function EditProfile() {
                         onChange={handleChange}
                         className={`w-full pl-12 pr-4 py-3 border ${
                           errors.name ? "border-red-500" : "border-gray-300"
-                        } rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                        placeholder="Tu nombre completo"
+                        } rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all`}
+                        placeholder="Nombre"
                       />
                     </div>
                     {errors.name && <p className="mt-1 text-sm text-red-500">{errors.name}</p>}
                   </div>
 
-                  {/* Email Field */}
+                  {/* Last Name Field */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Correo Electrónico *
+                      Apellido Paterno
                     </label>
                     <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                       <input
-                        type="email"
-                        name="email"
-                        value={formData.email}
+                        type="text"
+                        name="last_name"
+                        value={formData.last_name}
                         onChange={handleChange}
-                        className={`w-full pl-12 pr-4 py-3 border ${
-                          errors.email ? "border-red-500" : "border-gray-300"
-                        } rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                        placeholder="tu@email.com"
+                        className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                        placeholder="Apellido paterno"
                       />
                     </div>
-                    {errors.email && <p className="mt-1 text-sm text-red-500">{errors.email}</p>}
                   </div>
+
+                  {/* Second Last Name Field */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Apellido Materno
+                    </label>
+                    <div className="relative">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <input
+                        type="text"
+                        name="second_last_name"
+                        value={formData.second_last_name}
+                        onChange={handleChange}
+                        className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                        placeholder="Apellido materno"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Email Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Correo Electrónico *
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      className={`w-full pl-12 pr-4 py-3 border ${
+                        errors.email ? "border-red-500" : "border-gray-300"
+                      } rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all`}
+                      placeholder="tu@email.com"
+                    />
+                  </div>
+                  {errors.email && <p className="mt-1 text-sm text-red-500">{errors.email}</p>}
                 </div>
 
                 {/* Phone Field */}
@@ -336,8 +555,8 @@ export function EditProfile() {
                       onChange={handleChange}
                       className={`w-full pl-12 pr-4 py-3 border ${
                         errors.phone ? "border-red-500" : "border-gray-300"
-                      } rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                      placeholder="+1 (555) 123-4567"
+                      } rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all`}
+                      placeholder="(555) 123-4567"
                     />
                   </div>
                   {errors.phone && <p className="mt-1 text-sm text-red-500">{errors.phone}</p>}
@@ -355,7 +574,7 @@ export function EditProfile() {
                       value={formData.address}
                       onChange={handleChange}
                       rows={3}
-                      className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                      className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none transition-all"
                       placeholder="Tu dirección (opcional)"
                     />
                   </div>

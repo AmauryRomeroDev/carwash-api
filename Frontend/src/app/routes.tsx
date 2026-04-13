@@ -8,6 +8,7 @@ import { Services } from "./components/Services";
 import { Pricing } from "./components/Pricing";
 import { Booking } from "./components/Booking";
 import { Profile } from "./components/Profile";
+import { EditProfile } from "./components/EditProfile";
 import { Reviews } from "./components/Reviews";
 import { Products } from "./components/Products";
 import {Checkout} from "./components/Checkout";
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
       { path: "pricing", Component: Pricing },
       { path: "booking", Component: Booking },
       { path: "profile", Component: Profile },
+      { path: "profile/edit", Component: EditProfile },
       { path: "reviews", Component: Reviews },
       { path: "products", Component: Products },
       { path: "checkout", Component: Checkout },

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { User, Mail, Phone, MapPin, Settings, LogOut, Bell, HelpCircle, Shield, ChevronRight, Star, ShoppingBag, Car } from "lucide-react";
+import { User, Mail, Phone, MapPin, Settings, LogOut, Bell, HelpCircle, Shield, ChevronRight, Star, ShoppingBag, Car, Edit2 } from "lucide-react";
 import { motion } from "motion/react";
 import { BottomNav } from "./BottomNav";
 import { TopNav } from "./TopNav";
@@ -73,7 +73,6 @@ export function Profile() {
     const token = localStorage.getItem("access_token");
     
     try {
-      // Intentar cerrar sesión en el backend
       if (token) {
         await fetch("http://localhost:8000/api/v1/users/logout", {
           method: "POST",
@@ -85,7 +84,6 @@ export function Profile() {
     } catch (err) {
       console.error("Error al cerrar sesión:", err);
     } finally {
-      // Limpiar localStorage independientemente del resultado
       localStorage.clear();
       navigate("/");
     }
@@ -102,16 +100,21 @@ export function Profile() {
   ];
 
   // Solo mostrar panel admin si el usuario es admin
-  if (userData.role === "admin") {
-    quickActions.push({ icon: Shield, label: "Panel Admin", path: "/admin", color: "text-purple-600", bg: "bg-purple-50" });
-  }
+  const adminAction = { icon: Shield, label: "Panel Admin", path: "/admin", color: "text-purple-600", bg: "bg-purple-50" };
+  const allQuickActions = userData.role === "admin" ? [...quickActions, adminAction] : quickActions;
 
   const menuItems = [
-    { icon: Settings, label: "Configuración", description: "Ajusta tus preferencias", color: "text-blue-600", bg: "bg-blue-50" },
-    { icon: Bell, label: "Notificaciones", description: "Gestiona alertas", color: "text-purple-600", bg: "bg-purple-50" },
-    { icon: Shield, label: "Privacidad", description: "Seguridad de datos", color: "text-gray-600", bg: "bg-gray-50" },
-    { icon: HelpCircle, label: "Ayuda y Soporte", description: "Obtén asistencia", color: "text-orange-600", bg: "bg-orange-50" },
+    { icon: Settings, label: "Configuración", description: "Ajusta tus preferencias", color: "text-blue-600", bg: "bg-blue-50", path: "/profile/settings" },
+    { icon: Bell, label: "Notificaciones", description: "Gestiona alertas", color: "text-purple-600", bg: "bg-purple-50", path: "/profile/notifications" },
+    { icon: Shield, label: "Privacidad", description: "Seguridad de datos", color: "text-gray-600", bg: "bg-gray-50", path: "/profile/privacy" },
+    { icon: HelpCircle, label: "Ayuda y Soporte", description: "Obtén asistencia", color: "text-orange-600", bg: "bg-orange-50", path: "/profile/support" },
   ];
+
+  const getUserTypeLabel = () => {
+    if (userData.role === "admin") return "Administrador";
+    if (userData.type === "client") return "Cliente Premium";
+    return "Usuario";
+  };
 
   if (isLoading) {
     return (
@@ -191,9 +194,7 @@ export function Profile() {
                   </div>
                   <div className="flex-1">
                     <h2 className="text-xl font-bold mb-1">{userData.name}</h2>
-                    <p className="text-sm text-gray-500">
-                      {userData.role === "admin" ? "Administrador" : "Cliente Premium"}
-                    </p>
+                    <p className="text-sm text-gray-500">{getUserTypeLabel()}</p>
                   </div>
                 </div>
 
@@ -234,10 +235,11 @@ export function Profile() {
                   )}
                 </div>
 
-                <button 
+                <button
                   onClick={() => navigate("/profile/edit")}
-                  className="w-full mt-6 bg-blue-50 text-blue-600 py-3 rounded-xl font-medium hover:bg-blue-100 transition-colors"
+                  className="w-full mt-6 bg-blue-50 text-blue-600 py-3 rounded-xl font-medium hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
                 >
+                  <Edit2 className="h-4 w-4" />
                   Editar Perfil
                 </button>
               </motion.div>
@@ -272,9 +274,7 @@ export function Profile() {
                     {userData.name.charAt(0).toUpperCase()}
                   </div>
                   <h2 className="text-2xl font-bold mb-1 text-center">{userData.name}</h2>
-                  <p className="text-sm text-gray-500">
-                    {userData.role === "admin" ? "Administrador" : "Cliente Premium"}
-                  </p>
+                  <p className="text-sm text-gray-500">{getUserTypeLabel()}</p>
                 </div>
 
                 {/* Stats */}
@@ -317,10 +317,11 @@ export function Profile() {
                   )}
                 </div>
 
-                <button 
+                <button
                   onClick={() => navigate("/profile/edit")}
-                  className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors mb-3"
+                  className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors mb-3 flex items-center justify-center gap-2"
                 >
+                  <Edit2 className="h-4 w-4" />
                   Editar Perfil
                 </button>
 
@@ -347,7 +348,7 @@ export function Profile() {
                   <h3 className="font-semibold text-lg">Acciones Rápidas</h3>
                 </div>
                 <div className="divide-y divide-gray-100">
-                  {quickActions.map((item, index) => (
+                  {allQuickActions.map((item, index) => (
                     <button
                       key={index}
                       className="w-full flex items-center gap-4 p-6 hover:bg-gray-50 transition-colors"
@@ -378,6 +379,11 @@ export function Profile() {
                     <button
                       key={index}
                       className="w-full flex items-center gap-4 p-6 hover:bg-gray-50 transition-colors"
+                      onClick={() => {
+                        if (item.path) {
+                          navigate(item.path);
+                        }
+                      }}
                     >
                       <div className={`w-12 h-12 ${item.bg} rounded-xl flex items-center justify-center`}>
                         <item.icon className={`h-6 w-6 ${item.color}`} />
