@@ -10,6 +10,7 @@ import { Booking } from "./components/Booking";
 import { Profile } from "./components/Profile";
 import { Reviews } from "./components/Reviews";
 import { Products } from "./components/Products";
+import {Checkout} from "./components/Checkout";
 import { Vehicles } from "./components/Vehicles";
 import { NotFound } from "./components/NotFound";
 import { AdminLayout } from "./components/admin/AdminLayout";
@@ -35,6 +36,7 @@ export const router = createBrowserRouter([
       { path: "profile", Component: Profile },
       { path: "reviews", Component: Reviews },
       { path: "products", Component: Products },
+      { path: "checkout", Component: Checkout },
       { path: "vehicles", Component: Vehicles },
       { path: "*", Component: NotFound },
     ],

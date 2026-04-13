@@ -1,20 +1,24 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { ShoppingCart, Plus, Minus, Star, X } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Star, X, Tag } from "lucide-react";
 import { motion } from "motion/react";
 import { BottomNav } from "./BottomNav";
 import { TopNav } from "./TopNav";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 
 interface Product {
-  id: string;
-  name: string;
+  id: number;
+  product_name: string;
   description: string;
-  price: number;
-  category: string;
-  image: string;
-  rating: number;
-  reviews: number;
+  unit_price: number;
+  stock: number;
+  discount: number;
+  has_discount: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  category?: string;
+  image_url?: string;
 }
 
 interface CartItem extends Product {
@@ -23,98 +27,86 @@ interface CartItem extends Product {
 
 export function Products() {
   const navigate = useNavigate();
+  const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("Todos");
+  const [categories, setCategories] = useState<string[]>(["Todos"]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const isAuth = localStorage.getItem("isAuthenticated");
-    if (!isAuth) {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
       navigate("/");
       return;
     }
+    fetchProducts();
+    loadCart();
+  }, [navigate]);
 
-    // Load cart from localStorage
+  const fetchProducts = async () => {
+    const token = localStorage.getItem("access_token");
+    
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/products/", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.clear();
+          navigate("/");
+          return;
+        }
+        throw new Error("Error al cargar productos");
+      }
+
+      const data: Product[] = await response.json();
+      
+      // Filtrar solo productos activos
+      const activeProducts = data.filter(p => p.is_active === true);
+      setProducts(activeProducts);
+      
+      // Extraer categorías únicas (si no hay categoría, usar "General")
+      const uniqueCategories = [...new Set(activeProducts.map(p => p.category || "General"))];
+      setCategories(["Todos", ...uniqueCategories]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error de conexión");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadCart = () => {
     const savedCart = localStorage.getItem("cart");
     if (savedCart) {
       setCart(JSON.parse(savedCart));
     }
-  }, [navigate]);
+  };
 
-  const categories = ["Todos", "Shampoo", "Cera", "Accesorios", "Interior"];
+  const saveCart = (updatedCart: CartItem[]) => {
+    setCart(updatedCart);
+    localStorage.setItem("cart", JSON.stringify(updatedCart));
+  };
 
-  const products: Product[] = [
-    {
-      id: "1",
-      name: "Shampoo Premium",
-      description: "Shampoo profesional con pH neutro para lavado exterior",
-      price: 24.99,
-      category: "Shampoo",
-      image: "https://images.unsplash.com/photo-1631728747540-e328dbd3bba4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400",
-      rating: 4.8,
-      reviews: 124,
-    },
-    {
-      id: "2",
-      name: "Cera Carnauba",
-      description: "Cera premium con protección UV para brillo duradero",
-      price: 34.99,
-      category: "Cera",
-      image: "https://images.unsplash.com/photo-1625047509168-a7026f36de04?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400",
-      rating: 4.9,
-      reviews: 89,
-    },
-    {
-      id: "3",
-      name: "Kit de Microfibra",
-      description: "Set de 6 paños de microfibra de alta calidad",
-      price: 19.99,
-      category: "Accesorios",
-      image: "https://images.unsplash.com/photo-1563299796-17596ed6b017?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400",
-      rating: 4.7,
-      reviews: 156,
-    },
-    {
-      id: "4",
-      name: "Limpiador de Interiores",
-      description: "Limpiador multiusos para tablero y plásticos",
-      price: 15.99,
-      category: "Interior",
-      image: "https://images.unsplash.com/photo-1584464491033-06628f3a6b7b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400",
-      rating: 4.6,
-      reviews: 92,
-    },
-    {
-      id: "5",
-      name: "Aromatizante Premium",
-      description: "Fragancia de larga duración para el interior",
-      price: 12.99,
-      category: "Interior",
-      image: "https://images.unsplash.com/photo-1612198188060-c7c2a3b66eae?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400",
-      rating: 4.5,
-      reviews: 203,
-    },
-    {
-      id: "6",
-      name: "Protector de Llantas",
-      description: "Protector y abrillantador para neumáticos",
-      price: 16.99,
-      category: "Accesorios",
-      image: "https://images.unsplash.com/photo-1581540222194-0def2dda95b8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400",
-      rating: 4.7,
-      reviews: 78,
-    },
-  ];
-
-  const filteredProducts =
-    selectedCategory === "Todos"
-      ? products
-      : products.filter((p) => p.category === selectedCategory);
+  const getFinalPrice = (product: Product): number => {
+    if (product.has_discount && product.discount > 0) {
+      return product.unit_price * (1 - product.discount / 100);
+    }
+    return product.unit_price;
+  };
 
   const addToCart = (product: Product) => {
     const existingItem = cart.find((item) => item.id === product.id);
     let updatedCart: CartItem[];
 
     if (existingItem) {
+      // Verificar stock disponible
+      if (existingItem.quantity >= product.stock) {
+        return; // No se puede agregar más
+      }
       updatedCart = cart.map((item) =>
         item.id === product.id
           ? { ...item, quantity: item.quantity + 1 }
@@ -124,11 +116,10 @@ export function Products() {
       updatedCart = [...cart, { ...product, quantity: 1 }];
     }
 
-    setCart(updatedCart);
-    localStorage.setItem("cart", JSON.stringify(updatedCart));
+    saveCart(updatedCart);
   };
 
-  const removeFromCart = (productId: string) => {
+  const removeFromCart = (productId: number) => {
     const existingItem = cart.find((item) => item.id === productId);
     let updatedCart: CartItem[];
 
@@ -142,26 +133,85 @@ export function Products() {
       updatedCart = cart.filter((item) => item.id !== productId);
     }
 
-    setCart(updatedCart);
-    localStorage.setItem("cart", JSON.stringify(updatedCart));
+    saveCart(updatedCart);
   };
 
-  const getCartQuantity = (productId: string) => {
+  const removeItemCompletely = (productId: number) => {
+    const updatedCart = cart.filter((item) => item.id !== productId);
+    saveCart(updatedCart);
+  };
+
+  const getCartQuantity = (productId: number) => {
     const item = cart.find((item) => item.id === productId);
     return item ? item.quantity : 0;
   };
 
   const cartTotal = cart.reduce(
-    (total, item) => total + item.price * item.quantity,
+    (total, item) => total + getFinalPrice(item) * item.quantity,
     0
   );
 
   const cartItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
 
+  const filteredProducts =
+    selectedCategory === "Todos"
+      ? products
+      : products.filter((p) => (p.category || "General") === selectedCategory);
+
+  const getProductImage = (product: Product) => {
+    return product.image_url || "https://images.unsplash.com/photo-1631728747540-e328dbd3bba4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400";
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-MX', { 
+      day: 'numeric', 
+      month: 'short', 
+      year: 'numeric' 
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <>
+        <div className="hidden lg:block sticky top-0 z-50">
+          <TopNav />
+        </div>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Cargando productos...</p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <div className="hidden lg:block sticky top-0 z-50">
+          <TopNav />
+        </div>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">{error}</p>
+            <button
+              onClick={fetchProducts}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg"
+            >
+              Reintentar
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       {/* Top Navigation - Desktop Only */}
-      <div className="hidden lg:block">
+      <div className="hidden lg:block sticky top-0 z-50">
         <TopNav />
       </div>
 
@@ -175,7 +225,7 @@ export function Products() {
               transition={{ duration: 0.6 }}
             >
               <div className="flex items-center justify-between mb-4">
-                <h1 className="text-3xl">Productos</h1>
+                <h1 className="text-3xl font-bold">Productos</h1>
                 <div className="relative">
                   <ShoppingCart className="h-7 w-7" />
                   {cartItemsCount > 0 && (
@@ -201,7 +251,7 @@ export function Products() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
               >
-                <h1 className="text-4xl mb-4">Productos</h1>
+                <h1 className="text-4xl font-bold mb-4">Productos</h1>
                 <p className="text-xl text-blue-100">
                   Productos profesionales para el cuidado de tu auto
                 </p>
@@ -242,82 +292,116 @@ export function Products() {
 
               {/* Products Grid */}
               <div className="grid lg:grid-cols-2 gap-4 mb-6">
-                {filteredProducts.map((product, index) => {
-                  const quantity = getCartQuantity(product.id);
-                  return (
-                    <motion.div
-                      key={product.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: index * 0.1 }}
-                      className="bg-white rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex gap-4 p-4">
-                        <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100">
-                          <ImageWithFallback
-                            src={product.image}
-                            alt={product.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold mb-1 truncate">
-                            {product.name}
-                          </h3>
-                          <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-                            {product.description}
-                          </p>
-
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="flex items-center">
-                              <Star className="h-3 w-3 text-yellow-400 fill-current" />
-                              <span className="text-xs text-gray-600 ml-1">
-                                {product.rating}
-                              </span>
-                            </div>
-                            <span className="text-xs text-gray-400">
-                              ({product.reviews})
-                            </span>
-                          </div>
-
-                          <div className="flex items-center justify-between">
-                            <span className="text-lg font-bold text-blue-600">
-                              ${product.price.toFixed(2)}
-                            </span>
-
-                            {quantity === 0 ? (
-                              <button
-                                onClick={() => addToCart(product)}
-                                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
-                              >
-                                Agregar
-                              </button>
-                            ) : (
-                              <div className="flex items-center gap-2 bg-blue-50 rounded-lg">
-                                <button
-                                  onClick={() => removeFromCart(product.id)}
-                                  className="p-2 hover:bg-blue-100 rounded-lg transition-colors"
-                                >
-                                  <Minus className="h-4 w-4 text-blue-600" />
-                                </button>
-                                <span className="font-semibold text-blue-600 min-w-[20px] text-center">
-                                  {quantity}
-                                </span>
-                                <button
-                                  onClick={() => addToCart(product)}
-                                  className="p-2 hover:bg-blue-100 rounded-lg transition-colors"
-                                >
-                                  <Plus className="h-4 w-4 text-blue-600" />
-                                </button>
+                {filteredProducts.length > 0 ? (
+                  filteredProducts.map((product, index) => {
+                    const quantity = getCartQuantity(product.id);
+                    const finalPrice = getFinalPrice(product);
+                    const originalPrice = product.unit_price;
+                    const hasDiscount = product.has_discount && product.discount > 0;
+                    
+                    return (
+                      <motion.div
+                        key={product.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: index * 0.1 }}
+                        className="bg-white rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex gap-4 p-4">
+                          <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100 relative">
+                            {hasDiscount && (
+                              <div className="absolute top-0 left-0 bg-red-500 text-white text-xs px-2 py-1 rounded-br-lg">
+                                -{product.discount}%
                               </div>
                             )}
+                            <ImageWithFallback
+                              src={getProductImage(product)}
+                              alt={product.product_name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold mb-1 truncate">
+                              {product.product_name}
+                            </h3>
+                            <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                              {product.description}
+                            </p>
+
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs text-gray-500">
+                                Stock: {product.stock} unidades
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <div>
+                                {hasDiscount ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-lg font-bold text-blue-600">
+                                      ${finalPrice.toFixed(2)}
+                                    </span>
+                                    <span className="text-sm text-gray-400 line-through">
+                                      ${originalPrice.toFixed(2)}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-lg font-bold text-blue-600">
+                                    ${finalPrice.toFixed(2)}
+                                  </span>
+                                )}
+                              </div>
+
+                              {quantity === 0 ? (
+                                <button
+                                  onClick={() => addToCart(product)}
+                                  disabled={product.stock === 0}
+                                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                                    product.stock === 0
+                                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                      : "bg-blue-600 text-white hover:bg-blue-700"
+                                  }`}
+                                >
+                                  {product.stock === 0 ? "Agotado" : "Agregar"}
+                                </button>
+                              ) : (
+                                <div className="flex items-center gap-2 bg-blue-50 rounded-lg">
+                                  <button
+                                    onClick={() => removeFromCart(product.id)}
+                                    className="p-2 hover:bg-blue-100 rounded-lg transition-colors"
+                                  >
+                                    <Minus className="h-4 w-4 text-blue-600" />
+                                  </button>
+                                  <span className="font-semibold text-blue-600 min-w-[20px] text-center">
+                                    {quantity}
+                                  </span>
+                                  <button
+                                    onClick={() => addToCart(product)}
+                                    disabled={quantity >= product.stock}
+                                    className={`p-2 rounded-lg transition-colors ${
+                                      quantity >= product.stock
+                                        ? "text-gray-400 cursor-not-allowed"
+                                        : "hover:bg-blue-100 text-blue-600"
+                                    }`}
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </motion.div>
-                  );
-                })}
+                      </motion.div>
+                    );
+                  })
+                ) : (
+                  <div className="col-span-2 text-center py-12 bg-white rounded-2xl">
+                    <p className="text-gray-500">
+                      No hay productos en esta categoría
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -336,50 +420,59 @@ export function Products() {
 
                   {/* Cart Items */}
                   <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
-                    {cart.map((item) => (
-                      <div key={item.id} className="flex gap-3 pb-4 border-b border-gray-100 last:border-0">
-                        <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
-                          <ImageWithFallback
-                            src={item.image}
-                            alt={item.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm truncate">{item.name}</h4>
-                          <p className="text-blue-600 font-semibold text-sm mt-1">
-                            ${item.price.toFixed(2)}
-                          </p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <button
-                              onClick={() => removeFromCart(item.id)}
-                              className="p-1 hover:bg-gray-100 rounded transition-colors"
-                            >
-                              <Minus className="h-3 w-3 text-gray-600" />
-                            </button>
-                            <span className="text-sm font-medium min-w-[20px] text-center">
-                              {item.quantity}
-                            </span>
-                            <button
-                              onClick={() => addToCart(item)}
-                              className="p-1 hover:bg-gray-100 rounded transition-colors"
-                            >
-                              <Plus className="h-3 w-3 text-gray-600" />
-                            </button>
+                    {cart.map((item) => {
+                      const finalPrice = getFinalPrice(item);
+                      return (
+                        <div key={item.id} className="flex gap-3 pb-4 border-b border-gray-100 last:border-0">
+                          <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+                            <ImageWithFallback
+                              src={getProductImage(item)}
+                              alt={item.product_name}
+                              className="w-full h-full object-cover"
+                            />
                           </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-sm truncate">{item.product_name}</h4>
+                            <p className="text-blue-600 font-semibold text-sm mt-1">
+                              ${finalPrice.toFixed(2)}
+                            </p>
+                            {item.has_discount && (
+                              <p className="text-xs text-green-600">
+                                Ahorro: ${(item.unit_price - finalPrice).toFixed(2)}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-2 mt-2">
+                              <button
+                                onClick={() => removeFromCart(item.id)}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                              >
+                                <Minus className="h-3 w-3 text-gray-600" />
+                              </button>
+                              <span className="text-sm font-medium min-w-[20px] text-center">
+                                {item.quantity}
+                              </span>
+                              <button
+                                onClick={() => addToCart(item)}
+                                disabled={item.quantity >= item.stock}
+                                className={`p-1 rounded transition-colors ${
+                                  item.quantity >= item.stock
+                                    ? "text-gray-400 cursor-not-allowed"
+                                    : "hover:bg-gray-100 text-gray-600"
+                                }`}
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => removeItemCompletely(item.id)}
+                            className="p-1 hover:bg-red-50 rounded transition-colors self-start"
+                          >
+                            <X className="h-4 w-4 text-gray-400 hover:text-red-600" />
+                          </button>
                         </div>
-                        <button
-                          onClick={() => {
-                            const updatedCart = cart.filter((c) => c.id !== item.id);
-                            setCart(updatedCart);
-                            localStorage.setItem("cart", JSON.stringify(updatedCart));
-                          }}
-                          className="p-1 hover:bg-red-50 rounded transition-colors self-start"
-                        >
-                          <X className="h-4 w-4 text-gray-400 hover:text-red-600" />
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {/* Summary */}
@@ -398,7 +491,10 @@ export function Products() {
                         ${cartTotal.toFixed(2)}
                       </span>
                     </div>
-                    <button className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors">
+                    <button 
+                      onClick={() => navigate("/checkout")}
+                      className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+                    >
                       Proceder al pago
                     </button>
                   </div>
@@ -433,7 +529,10 @@ export function Products() {
                     </p>
                   </div>
                 </div>
-                <button className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors">
+                <button 
+                  onClick={() => navigate("/checkout")}
+                  className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+                >
                   Proceder al pago
                 </button>
               </motion.div>

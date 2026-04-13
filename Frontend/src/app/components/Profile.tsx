@@ -5,41 +5,106 @@ import { motion } from "motion/react";
 import { BottomNav } from "./BottomNav";
 import { TopNav } from "./TopNav";
 
+interface UserData {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  type: string;
+  role?: string;
+}
+
 export function Profile() {
   const navigate = useNavigate();
-  const [userData, setUserData] = useState({
+  const [isLoading, setIsLoading] = useState(true);
+  const [userData, setUserData] = useState<UserData>({
+    id: 0,
     name: "",
     email: "",
     phone: "",
     address: "",
+    type: "",
+    role: "",
   });
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    const isAuth = localStorage.getItem("isAuthenticated");
-    if (!isAuth) {
+  const fetchUserData = async () => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
       navigate("/");
       return;
     }
 
-    setUserData({
-      name: localStorage.getItem("userName") || "Usuario",
-      email: localStorage.getItem("userEmail") || "",
-      phone: localStorage.getItem("userPhone") || "",
-      address: localStorage.getItem("userAddress") || "",
-    });
-  }, [navigate]);
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/users/me", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate("/");
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.clear();
+          navigate("/");
+          return;
+        }
+        throw new Error("Error al obtener datos del usuario");
+      }
+
+      const data = await response.json();
+      setUserData({
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        phone: data.phone || "",
+        address: data.address || "",
+        type: data.type,
+        role: data.role,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error de conexión");
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const handleLogout = async () => {
+    const token = localStorage.getItem("access_token");
+    
+    try {
+      // Intentar cerrar sesión en el backend
+      if (token) {
+        await fetch("http://localhost:8000/api/v1/users/logout", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
+    } catch (err) {
+      console.error("Error al cerrar sesión:", err);
+    } finally {
+      // Limpiar localStorage independientemente del resultado
+      localStorage.clear();
+      navigate("/");
+    }
+  };
+
+  useEffect(() => {
+    fetchUserData();
+  }, [navigate]);
 
   const quickActions = [
     { icon: Car, label: "Mis Vehículos", path: "/vehicles", color: "text-blue-600", bg: "bg-blue-50" },
     { icon: Star, label: "Mis Reseñas", path: "/reviews", color: "text-yellow-600", bg: "bg-yellow-50" },
     { icon: ShoppingBag, label: "Productos", path: "/products", color: "text-green-600", bg: "bg-green-50" },
-    { icon: Shield, label: "Panel Admin", path: "/admin", color: "text-purple-600", bg: "bg-purple-50" },
   ];
+
+  // Solo mostrar panel admin si el usuario es admin
+  if (userData.role === "admin") {
+    quickActions.push({ icon: Shield, label: "Panel Admin", path: "/admin", color: "text-purple-600", bg: "bg-purple-50" });
+  }
 
   const menuItems = [
     { icon: Settings, label: "Configuración", description: "Ajusta tus preferencias", color: "text-blue-600", bg: "bg-blue-50" },
@@ -48,10 +113,47 @@ export function Profile() {
     { icon: HelpCircle, label: "Ayuda y Soporte", description: "Obtén asistencia", color: "text-orange-600", bg: "bg-orange-50" },
   ];
 
+  if (isLoading) {
+    return (
+      <>
+        <div className="hidden lg:block sticky top-0 z-50">
+          <TopNav />
+        </div>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Cargando perfil...</p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <div className="hidden lg:block sticky top-0 z-50">
+          <TopNav />
+        </div>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">{error}</p>
+            <button
+              onClick={fetchUserData}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg"
+            >
+              Reintentar
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       {/* Top Navigation - Desktop Only */}
-      <div className="hidden lg:block">
+      <div className="hidden lg:block sticky top-0 z-50">
         <TopNav />
       </div>
 
@@ -89,7 +191,9 @@ export function Profile() {
                   </div>
                   <div className="flex-1">
                     <h2 className="text-xl font-bold mb-1">{userData.name}</h2>
-                    <p className="text-sm text-gray-500">Cliente Premium</p>
+                    <p className="text-sm text-gray-500">
+                      {userData.role === "admin" ? "Administrador" : "Cliente Premium"}
+                    </p>
                   </div>
                 </div>
 
@@ -105,28 +209,35 @@ export function Profile() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 text-gray-700">
-                    <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
-                      <Phone className="h-5 w-5 text-gray-600" />
+                  {userData.phone && (
+                    <div className="flex items-center gap-3 text-gray-700">
+                      <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
+                        <Phone className="h-5 w-5 text-gray-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-500">Teléfono</p>
+                        <p className="font-medium">{userData.phone}</p>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-500">Teléfono</p>
-                      <p className="font-medium">{userData.phone}</p>
-                    </div>
-                  </div>
+                  )}
 
-                  <div className="flex items-center gap-3 text-gray-700">
-                    <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
-                      <MapPin className="h-5 w-5 text-gray-600" />
+                  {userData.address && (
+                    <div className="flex items-center gap-3 text-gray-700">
+                      <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
+                        <MapPin className="h-5 w-5 text-gray-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-500">Dirección</p>
+                        <p className="font-medium">{userData.address}</p>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-500">Dirección</p>
-                      <p className="font-medium">{userData.address}</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
-                <button className="w-full mt-6 bg-blue-50 text-blue-600 py-3 rounded-xl font-medium hover:bg-blue-100 transition-colors">
+                <button 
+                  onClick={() => navigate("/profile/edit")}
+                  className="w-full mt-6 bg-blue-50 text-blue-600 py-3 rounded-xl font-medium hover:bg-blue-100 transition-colors"
+                >
                   Editar Perfil
                 </button>
               </motion.div>
@@ -161,7 +272,9 @@ export function Profile() {
                     {userData.name.charAt(0).toUpperCase()}
                   </div>
                   <h2 className="text-2xl font-bold mb-1 text-center">{userData.name}</h2>
-                  <p className="text-sm text-gray-500">Cliente Premium</p>
+                  <p className="text-sm text-gray-500">
+                    {userData.role === "admin" ? "Administrador" : "Cliente Premium"}
+                  </p>
                 </div>
 
                 {/* Stats */}
@@ -190,17 +303,24 @@ export function Profile() {
                     <p className="text-xs text-gray-500 mb-1">Correo electrónico</p>
                     <p className="font-medium text-gray-700">{userData.email}</p>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Teléfono</p>
-                    <p className="font-medium text-gray-700">{userData.phone}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Dirección</p>
-                    <p className="font-medium text-gray-700">{userData.address}</p>
-                  </div>
+                  {userData.phone && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Teléfono</p>
+                      <p className="font-medium text-gray-700">{userData.phone}</p>
+                    </div>
+                  )}
+                  {userData.address && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Dirección</p>
+                      <p className="font-medium text-gray-700">{userData.address}</p>
+                    </div>
+                  )}
                 </div>
 
-                <button className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors mb-3">
+                <button 
+                  onClick={() => navigate("/profile/edit")}
+                  className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors mb-3"
+                >
                   Editar Perfil
                 </button>
 

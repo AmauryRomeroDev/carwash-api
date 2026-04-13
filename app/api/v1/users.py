@@ -1,13 +1,17 @@
 # app/api/v1/users.py
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.database.connection import get_db
 from app.core.dependencies import get_current_user, RoleChecker
 from app.models.user import User
+from app.models.order_service import OrderService
+from app.models.order_product import OrderProduct
+from app.models.service import Service
+from app.models.product import Product
 from app.schemas.user import UserUpdate, UserRead
 from app.core.security import get_password_hash
 from app.models.session import UserSession
-
+from app.schemas.order_service import  OrderServiceRead
 router = APIRouter()
 
 # Read ------------
@@ -123,3 +127,64 @@ def deactivate_my_account(
 
     db.commit()
     return None
+ # Show products and services of the user -----------------
+@router.get("/my-purchase-history", status_code=status.HTTP_200_OK)
+async def get_my_purchase_history(
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Obtiene el historial de servicios solicitados y productos comprados
+    por el usuario autenticado.
+    """
+    # 1. Validar que el usuario sea de tipo cliente y tenga perfil asociado
+    if current_user.type != "client" or not current_user.client:
+        raise HTTPException(
+            status_code=403, 
+            detail="Solo los clientes tienen un historial de compras personal."
+        )
+    
+    client_id = current_user.client.id
+
+    # 2. Consultar Servicios (con carga de relación al nombre del servicio)
+    services = (
+        db.query(OrderService)
+        .options(joinedload(OrderService.service))
+        .filter(OrderService.client_id == client_id)
+        .order_by(OrderService.created_at.desc())
+        .all()
+    )
+
+    # 3. Consultar Productos
+    products = (
+        db.query(OrderProduct)
+        .options(joinedload(OrderProduct.product))
+        .filter(OrderProduct.client_id == client_id)
+        .order_by(OrderProduct.created_at.desc())
+        .all()
+    )
+
+    # 4. Formatear respuesta
+    return {
+        "services": [
+            {
+                "id": s.id,
+                "ticket_id": s.ticket_id,
+                "service_name": s.service.service_name if s.service else "N/A",
+                "date": s.created_at,
+                "total": float(s.subtotal),
+                "status": "Completado" if s.completion_time else "En proceso",
+                "notes": s.notes
+            } for s in services
+        ],
+        "products": [
+            {
+                "id": p.id,
+                "ticket_id": p.ticket_id,
+                "product_name": p.product.name if p.product else "N/A",
+                "amount": p.amount,
+                "date": p.created_at,
+                "total": float(p.subtotal)
+            } for p in products
+        ]
+    }

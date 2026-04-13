@@ -1,81 +1,217 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Calendar, Clock, Car, User, Mail, Phone, CheckCircle, MapPin } from "lucide-react";
+import { Calendar, Clock, Car, User, Mail, Phone, CheckCircle, MapPin, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
 import { BottomNav } from "./BottomNav";
 import { TopNav } from "./TopNav";
 
+interface UserData {
+  id: number;
+  name: string;
+  email: string;
+  type: string;
+  address?: string;
+  client?: {
+    id: number;
+  };
+}
+
+interface Vehicle {
+  id: number;
+  brand: string;
+  model: string;
+  liscence_plate: string;
+  is_temporary: boolean;
+}
+
+interface Service {
+  is_active: boolean;
+  id: number;
+  service_name: string;
+  description: string;
+  price: number;
+  duration_minutes: number;
+  has_discount: boolean;
+  discount: number;
+}
+
 export function Booking() {
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const isAuth = localStorage.getItem("isAuthenticated");
-    if (!isAuth) {
-      navigate("/");
-    }
-  }, [navigate]);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [createdTicket, setCreatedTicket] = useState<any>(null);
+  const [error, setError] = useState("");
 
   const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    vehicleType: "",
-    service: "",
+    vehicleId: "",
+    serviceId: "",
     date: "",
     time: "",
     notes: "",
   });
 
-  const [submitted, setSubmitted] = useState(false);
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      navigate("/");
+      return;
+    }
+    fetchUserData();
+    fetchServices();
+    fetchVehicles();
+  }, [navigate]);
 
-  const services = [
-    "Lavado Básico - $15",
-    "Lavado Premium - $35",
-    "Lavado Deluxe - $65",
-    "Detallado Interior - $45",
-    "Pulido y Encerado - $50",
-    "Limpieza de Motor - $30",
-  ];
-
-  const vehicleTypes = [
-    "Sedan / Compacto",
-    "SUV / Van",
-    "Camioneta / Truck",
-    "Vehículo de lujo",
-  ];
-
-  const timeSlots = [
-    "8:00 AM",
-    "9:00 AM",
-    "10:00 AM",
-    "11:00 AM",
-    "12:00 PM",
-    "1:00 PM",
-    "2:00 PM",
-    "3:00 PM",
-    "4:00 PM",
-    "5:00 PM",
-    "6:00 PM",
-  ];
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Simulate form submission
-    setSubmitted(true);
-    // Reset form after 5 seconds
-    setTimeout(() => {
-      setSubmitted(false);
-      setFormData({
-        name: "",
-        email: "",
-        phone: "",
-        vehicleType: "",
-        service: "",
-        date: "",
-        time: "",
-        notes: "",
+  const fetchUserData = async () => {
+    const token = localStorage.getItem("access_token");
+    
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/users/me", {
+        headers: { Authorization: `Bearer ${token}` },
       });
-    }, 5000);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.clear();
+          navigate("/");
+          return;
+        }
+        throw new Error("Error al cargar datos del usuario");
+      }
+
+      const data = await response.json();
+      setUserData(data);
+    } catch (err) {
+      console.error("Error:", err);
+    }
+  };
+
+  const fetchServices = async () => {
+    const token = localStorage.getItem("access_token");
+    
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/services/", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Transformar los datos para asegurar tipos numéricos
+        const transformedServices = data
+          .filter((s: Service) => s.is_active !== false)
+          .map((service: Service) => ({
+            ...service,
+            price: typeof service.price === 'number' ? service.price : Number(service.price) || 0,
+            discount: typeof service.discount === 'number' ? service.discount : Number(service.discount) || 0,
+          }));
+        setServices(transformedServices);
+      }
+    } catch (err) {
+      console.error("Error al cargar servicios:", err);
+    }
+  };
+
+  const fetchVehicles = async () => {
+    const token = localStorage.getItem("access_token");
+    
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/vehicles/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setVehicles(data);
+      }
+    } catch (err) {
+      console.error("Error al cargar vehículos:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getFinalPrice = (service: Service): number => {
+    const price = typeof service.price === 'number' ? service.price : Number(service.price) || 0;
+    
+    if (service.has_discount && service.discount > 0) {
+      const discount = typeof service.discount === 'number' ? service.discount : Number(service.discount) || 0;
+      return Number((price * (1 - discount / 100)).toFixed(2));
+    }
+    return Number(price.toFixed(2));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    
+    if (!formData.vehicleId) {
+      setError("Por favor selecciona un vehículo");
+      return;
+    }
+    if (!formData.serviceId) {
+      setError("Por favor selecciona un servicio");
+      return;
+    }
+    if (!formData.date) {
+      setError("Por favor selecciona una fecha");
+      return;
+    }
+    if (!formData.time) {
+      setError("Por favor selecciona una hora");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const token = localStorage.getItem("access_token");
+    const selectedService = services.find(s => s.id === parseInt(formData.serviceId));
+    const finalPrice = selectedService ? getFinalPrice(selectedService) : 0;
+    
+    // Combinar fecha y hora
+    const deliveryDateTime = new Date(`${formData.date}T${formData.time}`);
+    
+    // Crear la orden de servicio con el formato completo
+    const orderData = [{
+      client_id: userData?.client?.id || 0,
+      vehicle_id: parseInt(formData.vehicleId),
+      service_id: parseInt(formData.serviceId),
+      washer_id: 0,
+      casher_id: 0,
+      delivery_time: deliveryDateTime.toISOString(),
+      start_time: deliveryDateTime.toISOString(),
+      completion_time: null,
+      subtotal: finalPrice,
+      notes: formData.notes,
+      is_active: true
+    }];
+
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/sells/services/sells", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(orderData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Error al crear la reserva");
+      }
+
+      const ticketData = await response.json();
+      setCreatedTicket(ticketData);
+      setSubmitted(true);
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error de conexión");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (
@@ -87,58 +223,91 @@ export function Booking() {
     });
   };
 
-  if (submitted) {
+  const timeSlots = [
+    "08:00", "09:00", "10:00", "11:00", "12:00",
+    "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"
+  ];
+
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 pb-24">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5 }}
-          className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center"
-        >
-          <div className="bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="h-12 w-12 text-green-600" />
+      <>
+        <div className="hidden lg:block sticky top-0 z-50">
+          <TopNav />
+        </div>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 text-blue-600 animate-spin mx-auto" />
+            <p className="mt-4 text-gray-600">Cargando...</p>
           </div>
-          <h2 className="text-3xl mb-4">¡Reserva Confirmada!</h2>
-          <p className="text-xl text-gray-600 mb-6">
-            Gracias, <strong>{formData.name}</strong>. Hemos recibido tu solicitud de reserva.
-          </p>
-          <div className="bg-gray-50 rounded-lg p-6 text-left mb-6">
-            <h3 className="font-semibold mb-3">Detalles de tu reserva:</h3>
-            <ul className="space-y-2 text-gray-700">
-              <li><strong>Servicio:</strong> {formData.service}</li>
-              <li><strong>Vehículo:</strong> {formData.vehicleType}</li>
-              <li><strong>Fecha:</strong> {new Date(formData.date).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</li>
-              <li><strong>Hora:</strong> {formData.time}</li>
-            </ul>
-          </div>
-          <p className="text-gray-600 mb-6">
-            Te hemos enviado un correo de confirmación a <strong>{formData.email}</strong>
-          </p>
-          <div className="space-y-3">
-            <button
-              onClick={() => navigate("/home")}
-              className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
-            >
-              Volver al Inicio
-            </button>
-            <button
-              onClick={() => navigate("/reviews")}
-              className="w-full bg-white text-blue-600 border-2 border-blue-600 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors"
-            >
-              Dejar una Reseña
-            </button>
-          </div>
-        </motion.div>
-        <BottomNav />
-      </div>
+        </div>
+      </>
+    );
+  }
+
+  if (submitted && createdTicket) {
+    const selectedService = services.find(s => s.id === parseInt(formData.serviceId));
+    const selectedVehicle = vehicles.find(v => v.id === parseInt(formData.vehicleId));
+    const finalPrice = selectedService ? getFinalPrice(selectedService) : 0;
+    const ticketTotal = createdTicket.grand_total ? Number(createdTicket.grand_total) : finalPrice;
+    
+    return (
+      <>
+        <div className="hidden lg:block sticky top-0 z-50">
+          <TopNav />
+        </div>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 pb-24">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+            className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center"
+          >
+            <div className="bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle className="h-12 w-12 text-green-600" />
+            </div>
+            <h2 className="text-3xl font-bold mb-4">¡Reserva Confirmada!</h2>
+            <p className="text-xl text-gray-600 mb-6">
+              Gracias, <strong>{userData?.name}</strong>. Hemos recibido tu solicitud de reserva.
+            </p>
+            <div className="bg-gray-50 rounded-lg p-6 text-left mb-6">
+              <h3 className="font-semibold mb-3">Detalles de tu reserva:</h3>
+              <ul className="space-y-2 text-gray-700">
+                <li><strong>Ticket #:</strong> {createdTicket.ticket_id}</li>
+                <li><strong>Servicio:</strong> {selectedService?.service_name}</li>
+                <li><strong>Vehículo:</strong> {selectedVehicle?.brand} {selectedVehicle?.model} ({selectedVehicle?.liscence_plate})</li>
+                <li><strong>Fecha:</strong> {new Date(formData.date).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</li>
+                <li><strong>Hora:</strong> {formData.time}</li>
+                <li><strong>Total:</strong> ${ticketTotal.toFixed(2)}</li>
+              </ul>
+            </div>
+            <p className="text-gray-600 mb-6">
+              Te hemos enviado un correo de confirmación a <strong>{userData?.email}</strong>
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => navigate("/home")}
+                className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+              >
+                Volver al Inicio
+              </button>
+              <button
+                onClick={() => navigate("/my-bookings")}
+                className="w-full bg-white text-blue-600 border-2 border-blue-600 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors"
+              >
+                Ver mis reservas
+              </button>
+            </div>
+          </motion.div>
+          <BottomNav />
+        </div>
+      </>
     );
   }
 
   return (
     <>
       {/* Top Navigation - Desktop Only */}
-      <div className="hidden lg:block">
+      <div className="hidden lg:block sticky top-0 z-50">
         <TopNav />
       </div>
 
@@ -151,11 +320,11 @@ export function Booking() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
             >
-              <h1 className="text-3xl mb-4">
+              <h1 className="text-3xl font-bold mb-4">
                 Reserva Tu Cita
               </h1>
               <p className="text-blue-100">
-                Completa el formulario y nos pondremos en contacto contigo
+                Completa el formulario y confirma tu servicio
               </p>
             </motion.div>
           </div>
@@ -169,11 +338,11 @@ export function Booking() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
             >
-              <h1 className="text-4xl mb-4">
+              <h1 className="text-4xl font-bold mb-4">
                 Reservación de Cita
               </h1>
               <p className="text-xl text-blue-100">
-                Completa el formulario y nos pondremos en contacto contigo
+                Completa el formulario y confirma tu servicio
               </p>
             </motion.div>
           </div>
@@ -190,152 +359,116 @@ export function Booking() {
                 transition={{ duration: 0.6, delay: 0.2 }}
                 className="bg-white rounded-2xl shadow-lg p-6 lg:p-8"
               >
-                <h2 className="text-xl lg:text-2xl font-semibold mb-6">Datos Personales</h2>
+                <h2 className="text-xl lg:text-2xl font-semibold mb-6">Datos de la Reserva</h2>
+                
+                {error && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm">
+                    {error}
+                  </div>
+                )}
+                
                 <form onSubmit={handleSubmit} className="space-y-6">
-                  {/* Personal Information */}
-                  <div className="space-y-4">
-                    <div>
-                      <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                        Nombre *
-                      </label>
-                      <input
-                        type="text"
-                        id="name"
-                        name="name"
-                        required
-                        value={formData.name}
-                        onChange={handleChange}
-                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
-                        placeholder="Nombre completo"
-                      />
+                  {/* Datos del Usuario (pre-llenados) */}
+                  <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                    <h3 className="font-semibold text-gray-700 mb-2">Información de contacto</h3>
+                    <div className="flex items-center gap-3 text-gray-600">
+                      <User className="h-5 w-5" />
+                      <span>{userData?.name}</span>
                     </div>
-
-                    <div>
-                      <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-                        Teléfono *
-                      </label>
-                      <input
-                        type="tel"
-                        id="phone"
-                        name="phone"
-                        required
-                        value={formData.phone}
-                        onChange={handleChange}
-                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
-                        placeholder="Número de teléfono"
-                      />
-                    </div>
-
-                    <div>
-                      <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                        Correo *
-                      </label>
-                      <input
-                        type="email"
-                        id="email"
-                        name="email"
-                        required
-                        value={formData.email}
-                        onChange={handleChange}
-                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
-                        placeholder="correo@ejemplo.com"
-                      />
+                    <div className="flex items-center gap-3 text-gray-600">
+                      <Mail className="h-5 w-5" />
+                      <span>{userData?.email}</span>
                     </div>
                   </div>
 
-                  <div className="border-t border-gray-200 pt-6">
-                    <h3 className="text-lg font-semibold mb-4">Vehículo</h3>
-                    <div className="space-y-4">
-                      <div>
-                        <label htmlFor="vehicleType" className="block text-sm font-medium text-gray-700 mb-2">
-                          Marca *
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
-                          placeholder="Ej: Toyota"
-                        />
-                      </div>
-
-                      <div>
-                        <label htmlFor="vehicleModel" className="block text-sm font-medium text-gray-700 mb-2">
-                          Modelo *
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
-                          placeholder="Ej: Corolla"
-                        />
-                      </div>
-
-                      <div>
-                        <label htmlFor="service" className="block text-sm font-medium text-gray-700 mb-2">
-                          Tipo de servicio a realizar *
-                        </label>
-                        <select
-                          id="service"
-                          name="service"
-                          required
-                          value={formData.service}
-                          onChange={handleChange}
-                          className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
-                        >
-                          <option value="">Selecciona un servicio</option>
-                          {services.map((service, index) => (
-                            <option key={index} value={service}>
-                              {service}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
+                  {/* Vehículo */}
+                  <div>
+                    <label htmlFor="vehicleId" className="block text-sm font-medium text-gray-700 mb-2">
+                      <Car className="h-4 w-4 inline mr-1" />
+                      Selecciona tu vehículo *
+                    </label>
+                    <select
+                      id="vehicleId"
+                      name="vehicleId"
+                      required
+                      value={formData.vehicleId}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
+                    >
+                      <option value="">Selecciona un vehículo</option>
+                      {vehicles.map((vehicle) => (
+                        <option key={vehicle.id} value={vehicle.id}>
+                          {vehicle.brand} {vehicle.model} - {vehicle.liscence_plate}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
-                  <div className="border-t border-gray-200 pt-6">
-                    <h3 className="text-lg font-semibold mb-4">Seleccione la fecha para realizar el servicio</h3>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      <div>
-                        <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-2">
-                          Día *
-                        </label>
-                        <input
-                          type="date"
-                          id="date"
-                          name="date"
-                          required
-                          value={formData.date}
-                          onChange={handleChange}
-                          min={new Date().toISOString().split('T')[0]}
-                          className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          &nbsp;
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="YYYY"
-                          className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
-                        />
-                      </div>
-                    </div>
+                  {/* Servicio */}
+                  <div>
+                    <label htmlFor="serviceId" className="block text-sm font-medium text-gray-700 mb-2">
+                      Tipo de servicio *
+                    </label>
+                    <select
+                      id="serviceId"
+                      name="serviceId"
+                      required
+                      value={formData.serviceId}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
+                    >
+                      <option value="">Selecciona un servicio</option>
+                      {services.map((service) => {
+                        const finalPrice = getFinalPrice(service);
+                        const originalPrice = Number(service.price) || 0;
+                        const discountValue = Number(service.discount) || 0;
+                        
+                        return (
+                          <option key={service.id} value={service.id}>
+                            {service.service_name} - ${finalPrice.toFixed(2)}
+                            {service.has_discount && discountValue > 0 && 
+                              ` (${discountValue}% OFF - Original $${originalPrice.toFixed(2)})`
+                            }
+                          </option>
+                        );
+                      })}
+                    </select>
                   </div>
 
-                  <div className="border-t border-gray-200 pt-6">
-                    <h3 className="text-lg font-semibold mb-4">Seleccione una hora para realizar el servicio</h3>
+                  {/* Fecha y Hora */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div>
+                      <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-2">
+                        <Calendar className="h-4 w-4 inline mr-1" />
+                        Fecha *
+                      </label>
+                      <input
+                        type="date"
+                        id="date"
+                        name="date"
+                        required
+                        value={formData.date}
+                        onChange={handleChange}
+                        min={new Date().toISOString().split('T')[0]}
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="time" className="block text-sm font-medium text-gray-700 mb-2">
+                        <Clock className="h-4 w-4 inline mr-1" />
+                        Hora *
+                      </label>
                       <select
                         id="time"
                         name="time"
                         required
                         value={formData.time}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
                       >
                         <option value="">Selecciona una hora</option>
-                        {timeSlots.map((slot, index) => (
-                          <option key={index} value={slot}>
+                        {timeSlots.map((slot) => (
+                          <option key={slot} value={slot}>
                             {slot}
                           </option>
                         ))}
@@ -343,15 +476,37 @@ export function Booking() {
                     </div>
                   </div>
 
-                  {/* Submit Button */}
-                  <div className="pt-6">
-                    <button
-                      type="submit"
-                      className="w-full bg-blue-600 text-white py-4 rounded-xl font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                    >
-                      Agendar cita
-                    </button>
+                  {/* Notas */}
+                  <div>
+                    <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-2">
+                      Notas adicionales
+                    </label>
+                    <textarea
+                      id="notes"
+                      name="notes"
+                      value={formData.notes}
+                      onChange={handleChange}
+                      rows={3}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none resize-none"
+                      placeholder="Instrucciones especiales para el servicio..."
+                    />
                   </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full bg-blue-600 text-white py-4 rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        Procesando...
+                      </>
+                    ) : (
+                      "Confirmar Reserva"
+                    )}
+                  </button>
                 </form>
               </motion.div>
             </div>

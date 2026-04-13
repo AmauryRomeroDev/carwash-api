@@ -14,6 +14,9 @@ ALGORITHM = os.getenv("ALGORITHM")
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # 1. Rutas públicas (Igual que tu código)
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         EXCLUDED_PATHS = [
             "/api/v1/auth/login",
             "/api/v1/auth/register/client",

@@ -7,9 +7,12 @@ import { ImageWithFallback } from "./figma/ImageWithFallback";
 export function Signup() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
   const [formData, setFormData] = useState({
-    firstName: "",
+    name: "",
     lastName: "",
+    secondLastName: "",
     email: "",
     phone: "",
     address: "",
@@ -17,22 +20,52 @@ export function Signup() {
     confirmPassword: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
     
     if (formData.password !== formData.confirmPassword) {
-      alert("Las contraseñas no coinciden");
+      setError("Las contraseñas no coinciden");
       return;
     }
 
-    // Save user data to localStorage
-    localStorage.setItem("isAuthenticated", "true");
-    localStorage.setItem("userEmail", formData.email);
-    localStorage.setItem("userName", `${formData.firstName} ${formData.lastName}`);
-    localStorage.setItem("userPhone", formData.phone);
-    localStorage.setItem("userAddress", formData.address);
-    
-    navigate("/home");
+    if (formData.password.length < 6) {
+      setError("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/auth/register/client", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          last_name: formData.lastName,
+          second_last_name: formData.secondLastName,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          password: formData.password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Error al registrar usuario");
+      }
+
+      // Registro exitoso - redirigir al login
+      navigate("/login");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error de conexión");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,22 +110,28 @@ export function Signup() {
             <p className="text-gray-600">Completa tus datos para comenzar</p>
           </div>
 
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Name Fields - Side by side on desktop */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Name Fields - Three fields on desktop */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               {/* First Name */}
               <div>
-                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
                   Nombre
                 </label>
                 <div className="relative">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                   <input
                     type="text"
-                    id="firstName"
-                    name="firstName"
+                    id="name"
+                    name="name"
                     required
-                    value={formData.firstName}
+                    value={formData.name}
                     onChange={handleChange}
                     className="w-full pl-12 pr-4 py-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all bg-white"
                     placeholder="Juan"
@@ -103,7 +142,7 @@ export function Signup() {
               {/* Last Name */}
               <div>
                 <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
-                  Apellido
+                  Apellido Paterno
                 </label>
                 <div className="relative">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -116,6 +155,25 @@ export function Signup() {
                     onChange={handleChange}
                     className="w-full pl-12 pr-4 py-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all bg-white"
                     placeholder="Pérez"
+                  />
+                </div>
+              </div>
+
+              {/* Second Last Name */}
+              <div>
+                <label htmlFor="secondLastName" className="block text-sm font-medium text-gray-700 mb-2">
+                  Apellido Materno
+                </label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    type="text"
+                    id="secondLastName"
+                    name="secondLastName"
+                    value={formData.secondLastName}
+                    onChange={handleChange}
+                    className="w-full pl-12 pr-4 py-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all bg-white"
+                    placeholder="García"
                   />
                 </div>
               </div>
@@ -256,9 +314,10 @@ export function Signup() {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full bg-blue-600 text-white py-4 rounded-full font-semibold hover:bg-blue-700 transition-colors shadow-lg"
+              disabled={isLoading}
+              className="w-full bg-blue-600 text-white py-4 rounded-full font-semibold hover:bg-blue-700 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Crear Cuenta
+              {isLoading ? "Creando cuenta..." : "Crear Cuenta"}
             </button>
           </form>
 
@@ -275,7 +334,7 @@ export function Signup() {
       </div>
 
       {/* Left Side - Image (Desktop Only) */}
-      <div className="hidden lg:flex lg:flex-1 bg-gradient-to-br from-blue-600 to-blue-800 relative overflow-hidden">
+      <div className="hidden lg:flex lg:flex-1 sticky top-0 h-screen bg-gradient-to-br from-blue-600 to-blue-800 relative overflow-hidden">
         <div className="absolute inset-0">
           <ImageWithFallback
             src="https://images.unsplash.com/photo-1761934657948-708146148588?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjYXIlMjBkZXRhaWxpbmclMjBwcm9mZXNzaW9uYWwlMjBjbGVhbmluZ3xlbnwxfHx8fDE3NzQ0MTA1NTh8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
