@@ -234,21 +234,52 @@ def update_service_order(
 
 
 # DELETE--------------------------------------------
+
 @router.delete("/services/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_service_order(
+def cancel_or_delete_service_order(
     order_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(allow_admin),
+    current_user: User = Depends(get_current_user), # Obtenemos el usuario genérico
 ):
     order = db.query(OrderService).filter(OrderService.id == order_id).first()
+    
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
 
-    # Borrado lógico
+    # --- LÓGICA DE PERMISOS DE CANCELACIÓN ---
+    
+    is_admin = current_user.type == "admin"
+    is_employee = current_user.type == "employee"
+    
+    # Verificar si el usuario es el dueño de la reserva (Cliente)
+    is_owner = False
+    if current_user.type == "client" and current_user.client:
+        is_owner = (order.client_id == current_user.client.id)
+
+    # Solo pueden "cancelar" si: es Admin, es Empleado, o es el Dueño de la orden
+    if not (is_admin or is_employee or is_owner):
+        raise HTTPException(
+            status_code=403, 
+            detail="No tienes permiso para cancelar esta orden"
+        )
+
+    # --- RESTRICCIÓN DE ESTADO ---
+    # Opcional: No permitir cancelar si el servicio ya se completó
+    if order.completion_time:
+        raise HTTPException(
+            status_code=400, 
+            detail="No se puede cancelar un servicio que ya ha sido marcado como completado"
+        )
+
+    # Borrado lógico (Cancelación)
     order.is_active = False
+    
+    # Si quieres dejar rastro de quién canceló, podrías añadir un campo 'notes'
+    cancel_msg = f" - Cancelado por {current_user.type}: {current_user.name}"
+    order.notes = (order.notes or "") + cancel_msg
+
     db.commit()
     return None
-
 
 # Ticket -------------------------------------------------
 @router.get("/services/tickets/{ticket_id}", response_model=ServiceTicketResponse)

@@ -1,6 +1,7 @@
 # app/api/v1/users.py
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session, joinedload
+from datetime import datetime
 from app.database.connection import get_db
 from app.core.dependencies import get_current_user, RoleChecker
 from app.models.user import User
@@ -8,6 +9,7 @@ from app.models.order_service import OrderService
 from app.models.order_product import OrderProduct
 from app.models.service import Service
 from app.models.product import Product
+from app.models.employee import Employee
 from app.schemas.user import UserUpdate, UserRead
 from app.core.security import get_password_hash
 from app.models.session import UserSession
@@ -188,3 +190,193 @@ async def get_my_purchase_history(
             } for p in products
         ]
     }
+    
+# app/api/v1/users.py
+
+# Get all user's service bookings (reservas)
+@router.get("/my-bookings", status_code=status.HTTP_200_OK)
+async def get_my_bookings(
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Obtiene todas las reservas de servicios del usuario autenticado.
+    Incluye tanto activas como canceladas (is_active = false)
+    """
+    # Validar que el usuario sea de tipo cliente
+    if current_user.type != "client" or not current_user.client:
+        raise HTTPException(
+            status_code=403, 
+            detail="Solo los clientes pueden ver sus reservas."
+        )
+    
+    client_id = current_user.client.id
+
+    # Consultar todos los servicios del cliente con sus relaciones (incluyendo inactivos)
+    bookings = (
+        db.query(OrderService)
+        .options(
+            joinedload(OrderService.service),
+            joinedload(OrderService.vehicle),
+            joinedload(OrderService.washer).joinedload(Employee.user),
+            joinedload(OrderService.casher).joinedload(Employee.user)
+        )
+        .filter(OrderService.client_id == client_id)
+        .order_by(OrderService.created_at.desc())
+        .all()
+    )
+
+    # Formatear respuesta incluyendo is_active
+    return [
+        {
+            "id": booking.id,
+            "ticket_id": booking.ticket_id,
+            "service": {
+                "id": booking.service.id if booking.service else None,
+                "name": booking.service.service_name if booking.service else "N/A",
+                "price": float(booking.service.price) if booking.service else 0,
+                "duration_minutes": booking.service.duration_minutes if booking.service else 0
+            },
+            "vehicle": {
+                "id": booking.vehicle.id if booking.vehicle else None,
+                "brand": booking.vehicle.brand if booking.vehicle else "N/A",
+                "model": booking.vehicle.model if booking.vehicle else "N/A",
+                "license_plate": booking.vehicle.liscence_plate if booking.vehicle else "N/A"
+            },
+            "status": get_booking_status(booking),
+            "status_code": get_booking_status_code(booking),
+            "subtotal": float(booking.subtotal) if booking.subtotal else 0,
+            "delivery_time": booking.delivery_time.isoformat() if booking.delivery_time else None,
+            "start_time": booking.start_time.isoformat() if booking.start_time else None,
+            "completion_time": booking.completion_time.isoformat() if booking.completion_time else None,
+            "notes": booking.notes,
+            "created_at": booking.created_at.isoformat() if booking.created_at else None,
+            "updated_at": booking.updated_at.isoformat() if booking.updated_at else None,
+            "is_active": booking.is_active,  # <--- AGREGADO: indica si la reserva está activa o cancelada
+            "assigned_washer": {
+                "id": booking.washer.id if booking.washer else None,
+                "name": f"{booking.washer.user.name} {booking.washer.user.last_name}" if booking.washer and booking.washer.user else None
+            } if booking.washer else None,
+            "processed_by": {
+                "id": booking.casher.id if booking.casher else None,
+                "name": f"{booking.casher.user.name} {booking.casher.user.last_name}" if booking.casher and booking.casher.user else None
+            } if booking.casher else None
+        }
+        for booking in bookings
+    ]
+
+
+# Get one user's service booking by ID
+@router.get("/my-bookings/{booking_id}", status_code=status.HTTP_200_OK)
+async def get_my_booking_by_id(
+    booking_id: int,
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Obtiene una reserva específica del usuario autenticado por su ID.
+    """
+    # Validar que el usuario sea de tipo cliente
+    if current_user.type != "client" or not current_user.client:
+        raise HTTPException(
+            status_code=403, 
+            detail="Solo los clientes pueden ver sus reservas."
+        )
+    
+    client_id = current_user.client.id
+
+    # Buscar la reserva específica
+    booking = (
+        db.query(OrderService)
+        .options(
+            joinedload(OrderService.service),
+            joinedload(OrderService.vehicle),
+            joinedload(OrderService.washer).joinedload(Employee.user),
+            joinedload(OrderService.casher).joinedload(Employee.user)
+        )
+        .filter(
+            OrderService.id == booking_id,
+            OrderService.client_id == client_id
+        )
+        .first()
+    )
+
+    if not booking:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"No se encontró la reserva con ID {booking_id}"
+        )
+
+    # Formatear respuesta incluyendo is_active
+    return {
+        "id": booking.id,
+        "ticket_id": booking.ticket_id,
+        "service": {
+            "id": booking.service.id if booking.service else None,
+            "name": booking.service.service_name if booking.service else "N/A",
+            "description": booking.service.description if booking.service else None,
+            "price": float(booking.service.price) if booking.service else 0,
+            "duration_minutes": booking.service.duration_minutes if booking.service else 0,
+            "has_discount": booking.service.has_discount if booking.service else False,
+            "discount": booking.service.discount if booking.service else 0
+        },
+        "vehicle": {
+            "id": booking.vehicle.id if booking.vehicle else None,
+            "brand": booking.vehicle.brand if booking.vehicle else "N/A",
+            "model": booking.vehicle.model if booking.vehicle else "N/A",
+            "color": booking.vehicle.color if booking.vehicle else "N/A",
+            "license_plate": booking.vehicle.liscence_plate if booking.vehicle else "N/A",
+            "vehicle_type": booking.vehicle.vehicle_type if booking.vehicle else "N/A"
+        },
+        "status": get_booking_status(booking),
+        "status_code": get_booking_status_code(booking),
+        "subtotal": float(booking.subtotal) if booking.subtotal else 0,
+        "delivery_time": booking.delivery_time.isoformat() if booking.delivery_time else None,
+        "start_time": booking.start_time.isoformat() if booking.start_time else None,
+        "completion_time": booking.completion_time.isoformat() if booking.completion_time else None,
+        "notes": booking.notes,
+        "created_at": booking.created_at.isoformat() if booking.created_at else None,
+        "updated_at": booking.updated_at.isoformat() if booking.updated_at else None,
+        "is_active": booking.is_active,  # <--- AGREGADO: indica si la reserva está activa o cancelada
+        "assigned_washer": {
+            "id": booking.washer.id if booking.washer else None,
+            "name": f"{booking.washer.user.name} {booking.washer.user.last_name}" if booking.washer and booking.washer.user else None,
+            "email": booking.washer.user.email if booking.washer and booking.washer.user else None
+        } if booking.washer else None,
+        "processed_by": {
+            "id": booking.casher.id if booking.casher else None,
+            "name": f"{booking.casher.user.name} {booking.casher.user.last_name}" if booking.casher and booking.casher.user else None
+        } if booking.casher else None
+    }
+
+
+# Helper function to get booking status
+def get_booking_status(booking: OrderService) -> str:
+    """Determina el estado de la reserva basado en fechas y is_active"""
+    # Si está cancelada (borrado lógico)
+    if not booking.is_active:
+        return "Cancelado"
+    if booking.completion_time:
+        return "Completado"
+    elif booking.start_time and booking.start_time <= datetime.now():
+        return "En Proceso"
+    elif booking.delivery_time:
+        return "Agendado"
+    else:
+        return "Pendiente"
+
+
+# Helper function to get booking status code
+def get_booking_status_code(booking: OrderService) -> str:
+    """Devuelve un código de estado para la reserva"""
+    if not booking.is_active:
+        return "cancelled"
+    if booking.completion_time:
+        return "completed"
+    elif booking.start_time and booking.start_time <= datetime.now():
+        return "in_progress"
+    elif booking.delivery_time:
+        return "scheduled"
+    else:
+        return "pending"
+    

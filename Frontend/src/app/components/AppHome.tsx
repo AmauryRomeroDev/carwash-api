@@ -37,24 +37,24 @@ interface Comment {
   replies: Comment[];
 }
 
-interface PurchaseHistory {
-  services: Array<{
+interface Booking {
+  id: number;
+  ticket_id: number;
+  service: {
     id: number;
-    ticket_id: number;
-    service_name: string;
-    date: string;
-    total: number;
-    status: string;
-    notes: string;
-  }>;
-  products: Array<{
-    id: number;
-    ticket_id: number;
-    product_name: string;
-    amount: number;
-    date: string;
-    total: number;
-  }>;
+    name: string;
+    price: number;
+  };
+  vehicle: {
+    brand: string;
+    model: string;
+    license_plate: string;
+  };
+  status_code: string;
+  subtotal: number;
+  delivery_time: string | null;
+  created_at: string;
+  notes: string | null;
 }
 
 export function AppHome() {
@@ -62,7 +62,7 @@ export function AppHome() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [recentComments, setRecentComments] = useState<Comment[]>([]);
-  const [purchaseHistory, setPurchaseHistory] = useState<PurchaseHistory | null>(null);
+  const [recentBookings, setRecentBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -81,9 +81,7 @@ export function AppHome() {
     try {
       // 1. Obtener datos del usuario
       const userResponse = await fetch("http://localhost:8000/api/v1/users/me", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!userResponse.ok) {
@@ -100,9 +98,7 @@ export function AppHome() {
 
       // 2. Obtener servicios disponibles
       const servicesResponse = await fetch("http://localhost:8000/api/v1/services/", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       let servicesData: Service[] = [];
@@ -113,9 +109,7 @@ export function AppHome() {
 
       // 3. Obtener comentarios recientes
       const commentsResponse = await fetch("http://localhost:8000/api/v1/comments/", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (commentsResponse.ok) {
@@ -128,16 +122,30 @@ export function AppHome() {
         setRecentComments(sortedComments);
       }
 
-      // 4. Obtener historial de compras del usuario
-      const historyResponse = await fetch("http://localhost:8000/api/v1/users/my-purchase-history", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      // 4. Obtener reservas del usuario (incluyendo canceladas)
+      const bookingsResponse = await fetch("http://localhost:8000/api/v1/users/my-bookings", {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (historyResponse.ok) {
-        const historyData = await historyResponse.json();
-        setPurchaseHistory(historyData);
+      if (bookingsResponse.ok) {
+        const bookingsData: Booking[] = await bookingsResponse.json();
+        
+        // Filtrar solo servicios completados o en progreso (excluir cancelados)
+        // O mostrar todos pero con indicador visual
+        const activeBookings = bookingsData.filter(
+          booking => booking.status_code === 'completed' || booking.status_code === 'in_progress'
+        );
+        
+        // Ordenar por fecha más reciente y tomar los últimos 2
+        const sortedBookings = activeBookings
+          .sort((a, b) => {
+            const dateA = a.delivery_time ? new Date(a.delivery_time) : new Date(a.created_at);
+            const dateB = b.delivery_time ? new Date(b.delivery_time) : new Date(b.created_at);
+            return dateB.getTime() - dateA.getTime();
+          })
+          .slice(0, 2);
+        
+        setRecentBookings(sortedBookings);
       }
 
     } catch (err) {
@@ -148,7 +156,7 @@ export function AppHome() {
   };
 
   const getQuickServices = () => {
-    const defaultServices = [
+    const defaultServices: Array<{ icon: typeof Sparkles; name: string; color: string; id: number | null }> = [
       { icon: Sparkles, name: "Lavado\nBásico", color: "bg-blue-500", id: null },
       { icon: Clock, name: "Lavado\nRápido", color: "bg-green-500", id: null },
       { icon: Star, name: "Premium", color: "bg-yellow-500", id: null },
@@ -156,7 +164,7 @@ export function AppHome() {
     ];
 
     if (services.length > 0) {
-      return services.slice(0, 3).map((service) => {
+      const mappedServices: Array<{ icon: typeof Sparkles; name: string; color: string; id: number | null }> = services.slice(0, 3).map((service) => {
         let icon = Sparkles;
         let color = "bg-blue-500";
         
@@ -176,18 +184,41 @@ export function AppHome() {
           id: service.id,
         };
       });
+      
+      // Agregar el botón "Agendar" al final si tenemos menos de 4 items
+      if (mappedServices.length < 4) {
+        mappedServices.push(defaultServices[3]);
+      }
+      
+      return mappedServices;
     }
     
     return defaultServices;
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "Fecha no disponible";
     const date = new Date(dateString);
     return date.toLocaleDateString('es-MX', { 
       day: 'numeric', 
       month: 'short', 
       year: 'numeric' 
     });
+  };
+
+  const getStatusBadge = (statusCode: string) => {
+    switch (statusCode) {
+      case 'completed':
+        return { text: 'Completado', color: 'bg-green-100 text-green-700' };
+      case 'in_progress':
+        return { text: 'En Progreso', color: 'bg-yellow-100 text-yellow-700' };
+      case 'scheduled':
+        return { text: 'Agendado', color: 'bg-blue-100 text-blue-700' };
+      case 'cancelled':
+        return { text: 'Cancelado', color: 'bg-red-100 text-red-700' };
+      default:
+        return { text: statusCode, color: 'bg-gray-100 text-gray-700' };
+    }
   };
 
   const promotions = [
@@ -202,9 +233,6 @@ export function AppHome() {
       image: "https://images.unsplash.com/photo-1763291894075-33c686e1a72c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080",
     },
   ];
-
-  // Obtener los últimos 2 servicios del historial
-  const recentServices = purchaseHistory?.services.slice(0, 2) || [];
 
   if (isLoading) {
     return (
@@ -459,7 +487,7 @@ export function AppHome() {
                 </div>
               </div>
 
-              {/* Recent Services from Purchase History */}
+              {/* Recent Services from Bookings */}
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold">Servicios Recientes</h2>
@@ -471,32 +499,36 @@ export function AppHome() {
                   </button>
                 </div>
                 <div className="space-y-3">
-                  {recentServices.length > 0 ? (
-                    recentServices.map((service) => (
-                      <div key={service.id} className="bg-white rounded-2xl p-4 shadow-sm">
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-semibold">{service.service_name}</h3>
-                          <span className={`text-xs px-3 py-1 rounded-full ${
-                            service.status === "Completado" 
-                              ? "bg-green-100 text-green-700" 
-                              : "bg-yellow-100 text-yellow-700"
-                          }`}>
-                            {service.status}
-                          </span>
+                  {recentBookings.length > 0 ? (
+                    recentBookings.map((booking) => {
+                      const statusBadge = getStatusBadge(booking.status_code);
+                      return (
+                        <div key={booking.id} className="bg-white rounded-2xl p-4 shadow-sm">
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="font-semibold">{booking.service.name}</h3>
+                            <span className={`text-xs px-3 py-1 rounded-full ${statusBadge.color}`}>
+                              {statusBadge.text}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-500">
+                              {booking.vehicle.brand} {booking.vehicle.model}
+                            </span>
+                            <span className="font-medium text-blue-600">
+                              ${booking.subtotal.toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-400 mt-1">
+                            {formatDate(booking.delivery_time || booking.created_at)}
+                          </div>
+                          {booking.notes && (
+                            <p className="text-xs text-gray-400 mt-2 truncate">
+                              {booking.notes}
+                            </p>
+                          )}
                         </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-500">{formatDate(service.date)}</span>
-                          <span className="font-medium text-blue-600">
-                            ${service.total.toFixed(2)}
-                          </span>
-                        </div>
-                        {service.notes && (
-                          <p className="text-xs text-gray-400 mt-2 truncate">
-                            {service.notes}
-                          </p>
-                        )}
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <div className="bg-white rounded-2xl p-6 text-center shadow-sm">
                       <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-3" />
