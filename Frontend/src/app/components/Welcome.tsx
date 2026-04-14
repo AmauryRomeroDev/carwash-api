@@ -53,10 +53,6 @@ export function Welcome() {
           >
             Iniciar Sesión
           </Link>
-          <div className="flex items-center justify-center gap-2 text-sm text-blue-200 pt-4">
-            <span>Desliza para comenzar</span>
-            <ArrowRight className="h-4 w-4 animate-pulse" />
-          </div>
         </motion.div>
       </div>
     </div>

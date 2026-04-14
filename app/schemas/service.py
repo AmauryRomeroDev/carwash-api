@@ -20,6 +20,7 @@ class ServiceUpdate(ServiceBase):
     price: Optional[Decimal] = Field(..., ge=0, max_digits=10, decimal_places=2)
     duration_minutes: Optional[int] = Field(None, ge=1)
     discount: int
+    is_active: Optional[bool]
     has_discount: bool
     
 class ServiceRead(ServiceBase):

@@ -7,10 +7,22 @@ import { AppHome } from "./components/AppHome";
 import { Services } from "./components/Services";
 import { Pricing } from "./components/Pricing";
 import { Booking } from "./components/Booking";
+import {MyBookings} from "./components/MyBookings";
+import { Tickets } from "./components/Tickets";
 import { Profile } from "./components/Profile";
+import { EditProfile } from "./components/EditProfile";
 import { Reviews } from "./components/Reviews";
 import { Products } from "./components/Products";
+import {Checkout} from "./components/Checkout";
+import { Vehicles } from "./components/Vehicles";
 import { NotFound } from "./components/NotFound";
+import { AdminLayout } from "./components/admin/AdminLayout";
+import { AdminDashboard } from "./pages/admin/AdminDashboard";
+import { AdminStaff } from "./pages/admin/AdminStaff";
+import { AdminInventory } from "./pages/admin/AdminInventory";
+import { AdminProducts } from "./pages/admin/AdminProducts";
+import { AdminServices } from "./pages/admin/AdminServices";
+import { AdminComments } from "./pages/admin/AdminComments";
 
 export const router = createBrowserRouter([
   {
@@ -24,10 +36,27 @@ export const router = createBrowserRouter([
       { path: "services", Component: Services },
       { path: "pricing", Component: Pricing },
       { path: "booking", Component: Booking },
+      { path: "my-bookings", Component: MyBookings },
+      { path: "tickets", Component: Tickets },
       { path: "profile", Component: Profile },
+      { path: "profile/edit", Component: EditProfile },
       { path: "reviews", Component: Reviews },
       { path: "products", Component: Products },
+      { path: "checkout", Component: Checkout },
+      { path: "vehicles", Component: Vehicles },
       { path: "*", Component: NotFound },
+    ],
+  },
+  {
+    path: "/admin",
+    Component: AdminLayout,
+    children: [
+      { index: true, Component: AdminDashboard },
+      { path: "staff", Component: AdminStaff },
+      { path: "inventory", Component: AdminInventory },
+      { path: "products", Component: AdminProducts },
+      { path: "services", Component: AdminServices },
+      { path: "comments", Component: AdminComments },
     ],
   },
 ]);

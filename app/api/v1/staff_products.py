@@ -4,6 +4,7 @@ from sqlalchemy import func
 from typing import List
 from decimal import Decimal
 import enum
+import json
 
 from app.database.connection import get_db
 from app.core.dependencies import RoleChecker, get_current_user
@@ -16,12 +17,9 @@ from app.models.inventory_movements import InventoryMovement
 from app.models.employee import Employee
 
 
-# Esaquemas
+# Esquemas
 from app.schemas.order_product import OrderProductCreate
-from sqlalchemy.orm import joinedload
 from app.schemas.inventory_movements import InventoryMovementCreate, InventoryMovementRead
-
-
 
 router = APIRouter()
 
@@ -29,6 +27,28 @@ class MovementTypeEnum(enum.Enum):
     IN = "IN"
     OUT = "OUT"
     ADJUSTMENT = "ADJUSTMENT"
+
+
+def parse_day_labor(day_labor):
+    """Convierte day_labor de JSON string a lista"""
+    if day_labor is None:
+        return None
+    if isinstance(day_labor, list):
+        return day_labor
+    if isinstance(day_labor, str):
+        try:
+            return json.loads(day_labor)
+        except:
+            return None
+    return None
+
+
+def parse_employee_day_labor(employee):
+    """Convierte day_labor del empleado a lista"""
+    if employee and hasattr(employee, 'day_labor'):
+        employee.day_labor = parse_day_labor(employee.day_labor)
+    return employee
+
 
 # Permisos
 allow_admin = RoleChecker(["admin"])
@@ -40,7 +60,7 @@ allow_staff = RoleChecker(["admin", "employee"])
 # Get by type -----------------------------
 @router.get("/inventory/movements", response_model=List[InventoryMovementRead])
 def get_inventory_movements(
-    move_type: str = None,  # Opcional: "in", "out" o "adjustment"
+    move_type: str = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(allow_staff)
 ):
@@ -52,7 +72,15 @@ def get_inventory_movements(
     if move_type:
         query = query.filter(InventoryMovement.type == move_type.upper())
     
-    return query.order_by(InventoryMovement.id.desc()).all()
+    results = query.order_by(InventoryMovement.id.desc()).all()
+    
+    # Convertir day_labor de cada empleado a lista
+    for result in results:
+        if result and result.employee:
+            result.employee.day_labor = parse_day_labor(result.employee.day_labor)
+    
+    return results
+
 
 # Get by ID -------------------------------
 @router.get("/inventory/movements/{move_id}", response_model=InventoryMovementRead)
@@ -68,7 +96,13 @@ def get_movement_by_id(
 
     if not move:
         raise HTTPException(status_code=404, detail="Movimiento no encontrado")
+    
+    # Convertir day_labor del empleado a lista
+    if move and move.employee:
+        move.employee.day_labor = parse_day_labor(move.employee.day_labor)
+    
     return move
+
 
 # Create movement -------------------------
 @router.post("/inventory/movements", response_model=InventoryMovementRead)
@@ -77,9 +111,8 @@ def manual_inventory_adjust(
     db: Session = Depends(get_db), 
     current_user: User = Depends(allow_admin)
 ):
-    
     if not current_user.employee:
-        raise HTTPException(status_code=400, detail="El usuario no tiene perfil de empleado asiciado")
+        raise HTTPException(status_code=400, detail="El usuario no tiene perfil de empleado asociado")
     
     real_employee_id = current_user.employee.id
     
@@ -99,7 +132,6 @@ def manual_inventory_adjust(
     except KeyError:
         raise HTTPException(status_code=400, detail="Tipo de movimiento no válido")
 
-
     new_move = InventoryMovement(
         product_id=data.product_id,
         employee_id=real_employee_id,
@@ -116,8 +148,13 @@ def manual_inventory_adjust(
         joinedload(InventoryMovement.product),
         joinedload(InventoryMovement.employee).joinedload(Employee.user)
     ).filter(InventoryMovement.id == new_move.id).first()
+    
+    # Convertir day_labor del empleado a lista si es necesario
+    if result and result.employee:
+        result.employee.day_labor = parse_day_labor(result.employee.day_labor)
 
     return result
+
 
 # Update movement ------------------------------
 from app.schemas.inventory_movements import InventoryMovementUpdate
@@ -166,4 +203,9 @@ def update_inventory_movement(
 
     db.commit()
     db.refresh(move)
+    
+    # Convertir day_labor del empleado a lista
+    if move and move.employee:
+        move.employee.day_labor = parse_day_labor(move.employee.day_labor)
+    
     return move

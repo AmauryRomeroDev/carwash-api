@@ -11,34 +11,54 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 
 
+# app/middlewares/auth_middleware.py
+
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # 1. Rutas públicas (Igual que tu código)
+        # 0. EXCLUIR MÉTODO OPTIONS
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
+        # 1. Rutas públicas (sin autenticación)
         EXCLUDED_PATHS = [
             "/api/v1/auth/login",
             "/api/v1/auth/register/client",
             "/api/v1/auth/register/employee",
+            "/static",
             "/docs",
             "/redoc",
             "/openapi.json",
         ]
+        
+        # Rutas GET públicas (sin autenticación)
         PUBLIC_GET_PATHS = [
             "/api/v1/products",
             "/api/v1/services",
-            "/api/v1/comments",
+            "/api/v1/comments",  # GET público para comentarios aprobados
             "/api/v1/orders",
         ]
         
-        # 1. Validar rutas
+        # Rutas que requieren autenticación pero NO validación de sesión en DB
+        # (para rutas admin que ya tienen su propia validación)
+        AUTH_PATHS_NO_SESSION_CHECK = [
+            "/api/v1/comments/admin",
+            "/api/v1/comments/pending",
+            "/api/v1/comments/approve",
+            "/api/v1/comments/reject",
+            "/api/v1/comments/restore",
+        ]
+        
+        # Verificar si es ruta GET pública
         is_public_get = (
             request.method == "GET" 
             and any(request.url.path.startswith(p) for p in PUBLIC_GET_PATHS)
             and not request.url.path.endswith("/me")
+            and not any(request.url.path.startswith(p) for p in AUTH_PATHS_NO_SESSION_CHECK)
         )
 
+        # Si es ruta excluida o GET público, pasar directamente
         if any(request.url.path.startswith(p) for p in EXCLUDED_PATHS) or is_public_get:
             return await call_next(request)
-
 
         # 2. Validar Header
         auth_header = request.headers.get("Authorization")
@@ -55,35 +75,38 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if user_id is None:
                 return JSONResponse({"detail": "Token inválido: sub missing"}, 401)
 
-            # 4. VALIDACIÓN DE SESIÓN EN DB (Crucial)
-            db = SessionLocal()
-            try:
-                session_db = (
-                    db.query(UserSession)
-                    .filter(
-                        UserSession.user_id == user_id,
-                        UserSession.token == token,
-                        UserSession.is_active == True,
+            # 4. Verificar si es ruta que NO necesita validación de sesión en DB
+            is_auth_path_no_session = any(
+                request.url.path.startswith(p) for p in AUTH_PATHS_NO_SESSION_CHECK
+            )
+            
+            if not is_auth_path_no_session:
+                # VALIDACIÓN DE SESIÓN EN DB (solo para rutas que no son admin)
+                db = SessionLocal()
+                try:
+                    session_db = (
+                        db.query(UserSession)
+                        .filter(
+                            UserSession.user_id == user_id,
+                            UserSession.token == token,
+                            UserSession.is_active == True,
+                        )
+                        .first()
                     )
-                    .first()
-                )
 
-                # SI NO HAY SESIÓN ACTIVA EN DB -> 401
-                if not session_db:
-                    return JSONResponse(
-                        {
-                            "detail": "Sesión inválida, cerrada o inexistente en base de datos"
-                        },
-                        401,
-                    )
-            finally:
-                db.close()
+                    if not session_db:
+                        return JSONResponse(
+                            {
+                                "detail": "Sesión inválida, cerrada o inexistente en base de datos"
+                            },
+                            401,
+                        )
+                finally:
+                    db.close()
 
             # 5. Inyectar info en el 'state'
             request.state.user_id = user_id
-            request.state.token = (
-                token  # Inyectamos el token para usarlo en dependencias si es necesario
-            )
+            request.state.token = token
             request.state.user_type = payload.get("type")
             request.state.user_role = payload.get("role")
 

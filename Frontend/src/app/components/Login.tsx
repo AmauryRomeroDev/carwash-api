@@ -7,17 +7,57 @@ import { ImageWithFallback } from "./figma/ImageWithFallback";
 export function Login() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate login - in real app this would validate credentials
-    localStorage.setItem("isAuthenticated", "true");
-    localStorage.setItem("userEmail", formData.email);
-    navigate("/home");
+    setError("");
+    setIsLoading(true);
+
+    try {
+      // Usar FormData para OAuth2PasswordRequestForm
+      const formBody = new URLSearchParams();
+      formBody.append("username", formData.email);
+      formBody.append("password", formData.password);
+
+      const response = await fetch("http://localhost:8000/api/v1/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: formBody.toString(),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Credenciales inválidas");
+      }
+
+      // Guardar token y datos del usuario
+      localStorage.setItem("access_token", data.access_token);
+      localStorage.setItem("token_type", data.token_type);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      localStorage.setItem("isAuthenticated", "true");
+      
+      // Redirigir según el tipo de usuario
+      if (data.user.type === "client") {
+        navigate("/home");
+      } else if (data.user.type === "employee") {
+        navigate("/admin");
+      } else {
+        navigate("/home");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error de conexión");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,6 +101,12 @@ export function Login() {
             <h2 className="text-3xl lg:text-4xl mb-2">¡Bienvenido de vuelta!</h2>
             <p className="text-gray-600">Ingresa tus credenciales para continuar</p>
           </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm">
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Email */}
@@ -124,9 +170,10 @@ export function Login() {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full bg-blue-600 text-white py-4 rounded-full font-semibold hover:bg-blue-700 transition-colors shadow-lg"
+              disabled={isLoading}
+              className="w-full bg-blue-600 text-white py-4 rounded-full font-semibold hover:bg-blue-700 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Iniciar Sesión
+              {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
             </button>
           </form>
 
@@ -137,13 +184,6 @@ export function Login() {
               <Link to="/signup" className="text-blue-600 font-semibold hover:text-blue-700">
                 Regístrate aquí
               </Link>
-            </p>
-          </div>
-
-          {/* Demo Credentials */}
-          <div className="mt-8 p-4 bg-blue-50 rounded-xl border border-blue-200">
-            <p className="text-xs text-blue-800 text-center">
-              💡 Demo: Usa cualquier email y contraseña para probar la app
             </p>
           </div>
         </motion.div>
