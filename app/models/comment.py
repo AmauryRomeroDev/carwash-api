@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text,func
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text,func, Boolean
 from sqlalchemy.orm import relationship,backref
 from datetime import datetime
 from app.database.connection import Base
@@ -11,8 +11,9 @@ class Comment(Base):
     rating = Column(Integer, nullable=True) 
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
-
-    
+    # Nuevos campos
+    is_active = Column(Boolean, nullable=False, default=True)  # Borrado lógico
+    is_approved = Column(Boolean, nullable=False, default=False)  # Aprobación por admin
     # Relaciones de Usuario y Servicio
     author_id = Column(Integer, ForeignKey("users.id"))
     service_id = Column(Integer, ForeignKey("services.id"), nullable=True)

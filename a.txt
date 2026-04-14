@@ -53,12 +53,12 @@ CREATE TABLE IF NOT EXISTS clients (
 CREATE TABLE IF NOT EXISTS vehicles (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     client_id INT UNSIGNED NOT NULL,
-    liscence_plate VARCHAR(20) NOT NULL,          -- ← typo en el modelo, se mantiene como está
+    liscence_plate VARCHAR(20) NOT NULL,
     brand VARCHAR(50) NOT NULL,
     model VARCHAR(50) NOT NULL,
-    color varchar(20) not null,
+    color VARCHAR(20) NOT NULL,
     vehicle_type VARCHAR(50) NOT NULL,
-    is_temporary boolean default false,
+    is_temporary BOOLEAN DEFAULT FALSE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
@@ -74,29 +74,29 @@ CREATE TABLE IF NOT EXISTS vehicles (
 CREATE TABLE IF NOT EXISTS services (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     service_name VARCHAR(100) NOT NULL,
-    description VARCHAR(100) NOT NULL,
-    total DECIMAL(10,2) NOT NULL,
+    description TEXT DEFAULT NULL,
+    price DECIMAL(10,2) NOT NULL,
     duration_minutes INT NOT NULL,
-    discount int ,
-    has_discount boolean default false,
-    is_active boolean default true,
+    discount INT DEFAULT 0,
+    has_discount BOOLEAN DEFAULT FALSE,
+    is_active BOOLEAN DEFAULT TRUE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
     PRIMARY KEY (id)
 );
 
--- 5. order_services  (viene de tu modelo OrderService)
+-- 5. order_services
 CREATE TABLE IF NOT EXISTS order_services (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    ticket_id INT UNSIGNED NOT NULL,
     vehicle_id INT UNSIGNED NOT NULL,
-    client_id INT UNSIGNED ,
+    client_id INT UNSIGNED NULL,
     service_id INT UNSIGNED NOT NULL,
-    washer_id INT UNSIGNED ,
-    casher_id INT UNSIGNED ,
-    ticket_id int unsigned  not null,
+    washer_id INT UNSIGNED NULL,
+    casher_id INT UNSIGNED NULL,
     delivery_time DATETIME NOT NULL,
-    notes varchar(50),
+    notes TEXT NULL,
     start_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     completion_time DATETIME DEFAULT NULL,
     subtotal DECIMAL(10,2) NOT NULL,
@@ -105,24 +105,26 @@ CREATE TABLE IF NOT EXISTS order_services (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
     PRIMARY KEY (id),
+    KEY idx_ticket_id (ticket_id),
+    KEY idx_client_id (client_id),
     
     CONSTRAINT fk_os_vehicle   FOREIGN KEY (vehicle_id)   REFERENCES vehicles(id)   ON DELETE CASCADE,
-    CONSTRAINT fk_os_client    FOREIGN KEY (client_id)    REFERENCES clients(id)    ON DELETE CASCADE,
+    CONSTRAINT fk_os_client    FOREIGN KEY (client_id)    REFERENCES clients(id)    ON DELETE SET NULL,
     CONSTRAINT fk_os_service   FOREIGN KEY (service_id)   REFERENCES services(id)   ON DELETE CASCADE,
-    CONSTRAINT fk_os_washer    FOREIGN KEY (washer_id)    REFERENCES users(id)      ON DELETE CASCADE,
-    CONSTRAINT fk_os_casher    FOREIGN KEY (casher_id)    REFERENCES users(id)      ON DELETE CASCADE
+    CONSTRAINT fk_os_washer    FOREIGN KEY (washer_id)    REFERENCES users(id)      ON DELETE SET NULL,
+    CONSTRAINT fk_os_casher    FOREIGN KEY (casher_id)    REFERENCES users(id)      ON DELETE SET NULL
 );
 
 -- 6. products
 CREATE TABLE IF NOT EXISTS products (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    product_name varchar(50) default null,
-    description VARCHAR(255) DEFAULT NULL,
+    product_name VARCHAR(100) NOT NULL,
+    description TEXT DEFAULT NULL,
     unit_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     stock INT NOT NULL DEFAULT 0,
-    discount int ,
-    has_discount boolean default false,
-    is_active boolean not null default true,
+    discount INT DEFAULT 0,
+    has_discount BOOLEAN DEFAULT FALSE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
@@ -132,29 +134,31 @@ CREATE TABLE IF NOT EXISTS products (
 -- 7. order_products
 CREATE TABLE IF NOT EXISTS order_products (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    ticket_id INT UNSIGNED NOT NULL,
     product_id INT UNSIGNED NOT NULL,
     client_id INT UNSIGNED NOT NULL,
-    casher_id INT UNSIGNED ,
-    ticket_id int unsigned not null,
+    casher_id INT UNSIGNED NULL,
     amount INT NOT NULL DEFAULT 1,
-    total DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    total DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
     PRIMARY KEY (id),
+    KEY idx_ticket_id (ticket_id),
     
     CONSTRAINT fk_op_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-    CONSTRAINT fk_op_casher  FOREIGN KEY (casher_id)  REFERENCES users(id)     ON DELETE CASCADE,
-	CONSTRAINT fk_op_client FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT fk_op_casher  FOREIGN KEY (casher_id)  REFERENCES users(id)    ON DELETE SET NULL,
+    CONSTRAINT fk_op_client  FOREIGN KEY (client_id)  REFERENCES clients(id)  ON DELETE CASCADE
 );
 
--- 8. employees  (viene de tu modelo Employee)
+-- 8. employees
 CREATE TABLE IF NOT EXISTS employees (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     user_id INT UNSIGNED NOT NULL,
     role VARCHAR(50) NOT NULL,
-    is_active BOOLEAN default true,
+    day_labor JSON NULL,
+    is_active BOOLEAN DEFAULT TRUE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
@@ -169,10 +173,10 @@ CREATE TABLE IF NOT EXISTS inventory_movements (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     product_id INT UNSIGNED NOT NULL,
     employee_id INT UNSIGNED NOT NULL,
-    order_id INT UNSIGNED DEFAULT NULL,                -- referencia a order_products
+    order_id INT UNSIGNED DEFAULT NULL,
     type ENUM('IN','OUT','ADJUSTMENT') NOT NULL,
     amount INT NOT NULL DEFAULT 1,
-    note VARCHAR(100) DEFAULT NULL,
+    note VARCHAR(255) DEFAULT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
@@ -180,10 +184,10 @@ CREATE TABLE IF NOT EXISTS inventory_movements (
     
     CONSTRAINT fk_im_product  FOREIGN KEY (product_id)  REFERENCES products(id)        ON DELETE CASCADE,
     CONSTRAINT fk_im_employee FOREIGN KEY (employee_id) REFERENCES employees(id)      ON DELETE CASCADE,
-    CONSTRAINT fk_im_order    FOREIGN KEY (order_id)    REFERENCES order_products(id) ON DELETE CASCADE
+    CONSTRAINT fk_im_order    FOREIGN KEY (order_id)    REFERENCES order_products(id) ON DELETE SET NULL
 );
 
--- 10. comments  (viene de tu modelo Comment)
+-- 10. comments
 CREATE TABLE IF NOT EXISTS comments (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     content TEXT NOT NULL,
@@ -191,23 +195,30 @@ CREATE TABLE IF NOT EXISTS comments (
     author_id INT UNSIGNED NOT NULL,
     service_id INT UNSIGNED DEFAULT NULL,
     parent_id INT UNSIGNED DEFAULT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_approved BOOLEAN NOT NULL DEFAULT FALSE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
     PRIMARY KEY (id),
+    KEY idx_author (author_id),
+    KEY idx_service (service_id),
+    KEY idx_parent (parent_id),
+    KEY idx_active (is_active),
+    KEY idx_approved (is_approved),
     
     CONSTRAINT fk_comments_author  FOREIGN KEY (author_id)  REFERENCES users(id)     ON DELETE CASCADE,
     CONSTRAINT fk_comments_service FOREIGN KEY (service_id) REFERENCES services(id)  ON DELETE SET NULL,
     CONSTRAINT fk_comments_parent  FOREIGN KEY (parent_id)  REFERENCES comments(id)  ON DELETE CASCADE
 );
 
--- Opcional: si quieres mantener user_sessions del DDL original
+-- 11. user_sessions
 CREATE TABLE IF NOT EXISTS user_sessions (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     user_id INT UNSIGNED NOT NULL,
     token VARCHAR(500) NOT NULL,
     is_active TINYINT(1) DEFAULT 1,
-    last_login DATETIME not null default current_timestamp,
+    last_login DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
@@ -217,13 +228,23 @@ CREATE TABLE IF NOT EXISTS user_sessions (
     CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-
+-- Modificaciones para permitir nulos en order_services
 SET FOREIGN_KEY_CHECKS = 0;
 
--- Permitir que estos campos sean nulos para ventas online o sin asignar
-ALTER TABLE order_services MODIFY COLUMN casher_id INT unsigned NULL;
-ALTER TABLE order_services MODIFY COLUMN washer_id INT unsigned NULL;
-ALTER TABLE order_services MODIFY COLUMN client_id INT unsigned NULL;
-ALTER TABLE order_services modify COLUMN notes TEXT NULL;
+ALTER TABLE order_services MODIFY COLUMN casher_id INT UNSIGNED NULL;
+ALTER TABLE order_services MODIFY COLUMN washer_id INT UNSIGNED NULL;
+ALTER TABLE order_services MODIFY COLUMN client_id INT UNSIGNED NULL;
+ALTER TABLE order_services MODIFY COLUMN notes TEXT NULL;
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- Actualizar comentarios existentes a aprobados y activos
+UPDATE comments SET is_approved = TRUE, is_active = TRUE WHERE is_approved IS NULL;
+
+-- Insertar un usuario administrador de ejemplo (contraseña: admin123)
+-- La contraseña debe ser hasheada con bcrypt. Este es un ejemplo con hash de 'admin123'
+-- INSERT INTO users (name, last_name, email, phone_number, password, type, is_active) 
+-- VALUES ('Admin', 'Sistema', 'admin@autosplash.com', '1234567890', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTtYgT7QqYvQNq', 'employee', 1);
+
+-- INSERT INTO employees (user_id, role, is_active) 
+-- VALUES (LAST_INSERT_ID(), 'admin', 1);

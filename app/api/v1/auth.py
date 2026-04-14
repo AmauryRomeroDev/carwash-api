@@ -63,7 +63,7 @@ def register_employee(data: EmployeeCreate, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Empleado registrado con éxito"}
 
-@router.post("/register/client", status_code=status.HTTP_201_CREATED)
+@router.post("/register", status_code=status.HTTP_201_CREATED)
 def register_client(data: ClientCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="El email ya está registrado")

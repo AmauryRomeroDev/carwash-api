@@ -8,6 +8,7 @@ from app.api.v1.vehicle import router as vehicle_router
 from app.api.v1.services import router as service_router
 from app.api.v1.products import router as product_router
 from app.api.v1.comments import router as comment_router
+from app.api.v1.staff import router as staff_router
 
 
 router = APIRouter()
@@ -18,6 +19,7 @@ router.include_router(users_router, prefix="/users", tags=["Users"])
 router.include_router(staff_service_router, prefix="/staff", tags=["Staff - Services"])
 router.include_router(staff_product_router, prefix="/staff", tags=["Staff - Inventory"])
 router.include_router(staff_order_router, prefix="/staff", tags=["Staff - Products"])
+router.include_router(staff_router, prefix="/staff", tags=["Staff - Users"])
 router.include_router(vehicle_router, prefix="/vehicles", tags=["Vehicles"])
 router.include_router(service_router, prefix="/services", tags=["Services"])
 router.include_router(product_router, prefix="/products", tags=["Inventory"])

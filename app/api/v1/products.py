@@ -52,7 +52,7 @@ def create_product(
 
 
 # --- UPDATE (Solo Admin) ---
-@router.patch("/{product_id}", response_model=ProductRead)
+@router.put("/{product_id}", response_model=ProductRead)
 def update_product(
     product_id: int,
     data: ProductUpdate,

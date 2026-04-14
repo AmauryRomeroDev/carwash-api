@@ -16,7 +16,7 @@ allow_admin = RoleChecker(["admin"])
 @router.get("/", response_model=List[ServiceRead])
 def list_services(db: Session = Depends(get_db)):
     """Lista todos los servicios activos del catálogo"""
-    return db.query(Service).filter(Service.is_active == True).all()
+    return db.query(Service).all()
 
 # Read One -----------------------------------
 @router.get("/{service_id}", response_model=ServiceRead)
