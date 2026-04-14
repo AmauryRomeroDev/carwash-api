@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
-import { User, Mail, Phone, MapPin, Settings, LogOut, Bell, HelpCircle, Shield, ChevronRight, Star, ShoppingBag, Car, Edit2 } from "lucide-react";
-import { motion } from "motion/react";
+import { User, Mail, Phone, MapPin, Settings, LogOut, Bell, HelpCircle, Shield, ChevronRight, Star, ShoppingBag, Car, Edit2, Ticket, Calendar, Camera, X, Loader2 } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import { BottomNav } from "./BottomNav";
 import { TopNav } from "./TopNav";
 
@@ -13,6 +13,7 @@ interface UserData {
   address?: string;
   type: string;
   role?: string;
+  photo_url?: string;
 }
 
 export function Profile() {
@@ -26,8 +27,14 @@ export function Profile() {
     address: "",
     type: "",
     role: "",
+    photo_url: "",
   });
   const [error, setError] = useState("");
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchUserData = async () => {
     const token = localStorage.getItem("access_token");
@@ -55,12 +62,13 @@ export function Profile() {
       const data = await response.json();
       setUserData({
         id: data.id,
-        name: data.name,
+        name: `${data.name} ${data.last_name || ""} ${data.second_last_name || ""}`.trim(),
         email: data.email,
         phone: data.phone || "",
         address: data.address || "",
         type: data.type,
         role: data.role,
+        photo_url: data.photo_url || null,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error de conexión");
@@ -89,17 +97,101 @@ export function Profile() {
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo de archivo
+    if (!file.type.startsWith("image/")) {
+      setError("Por favor selecciona una imagen válida");
+      return;
+    }
+
+    // Validar tamaño (máximo 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError("La imagen no debe superar los 5MB");
+      return;
+    }
+
+    setSelectedFile(file);
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    setShowPhotoModal(true);
+    setError("");
+  };
+
+  const handleUploadPhoto = async () => {
+    if (!selectedFile) return;
+
+    const token = localStorage.getItem("access_token");
+    setIsUploading(true);
+    setError("");
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/users/me/image", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Error al subir la imagen");
+      }
+
+      const data = await response.json();
+      
+      // Actualizar la foto de perfil en el estado
+      setUserData(prev => ({
+        ...prev,
+        photo_url: data.photo_url,
+      }));
+      
+      setShowPhotoModal(false);
+      setSelectedFile(null);
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+      }
+      
+      // Recargar datos del usuario para asegurar consistencia
+      await fetchUserData();
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error de conexión");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const getPhotoUrl = () => {
+    if (userData.photo_url) {
+      // Si la URL es relativa, añadir el host
+      if (userData.photo_url.startsWith("/")) {
+        return `http://localhost:8000${userData.photo_url}`;
+      }
+      return userData.photo_url;
+    }
+    return null;
+  };
+
   useEffect(() => {
     fetchUserData();
   }, [navigate]);
 
   const quickActions = [
     { icon: Car, label: "Mis Vehículos", path: "/vehicles", color: "text-blue-600", bg: "bg-blue-50" },
+    { icon: Ticket, label: "Mis Tickets", path: "/tickets", color: "text-indigo-600", bg: "bg-indigo-50" },
+    { icon: Calendar, label: "Mis Reservas", path: "/my-bookings", color: "text-purple-600", bg: "bg-purple-50" },
     { icon: Star, label: "Mis Reseñas", path: "/reviews", color: "text-yellow-600", bg: "bg-yellow-50" },
     { icon: ShoppingBag, label: "Productos", path: "/products", color: "text-green-600", bg: "bg-green-50" },
   ];
 
-  // Solo mostrar panel admin si el usuario es admin
   const adminAction = { icon: Shield, label: "Panel Admin", path: "/admin", color: "text-purple-600", bg: "bg-purple-50" };
   const allQuickActions = userData.role === "admin" ? [...quickActions, adminAction] : quickActions;
 
@@ -153,6 +245,8 @@ export function Profile() {
     );
   }
 
+  const photoUrl = getPhotoUrl();
+
   return (
     <>
       {/* Top Navigation - Desktop Only */}
@@ -187,10 +281,26 @@ export function Profile() {
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-white rounded-2xl shadow-lg p-6 mb-6"
               >
-                {/* Avatar */}
+                {/* Avatar con opción de cambiar foto */}
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-blue-400 rounded-full flex items-center justify-center text-white text-3xl font-bold">
-                    {userData.name.charAt(0).toUpperCase()}
+                  <div className="relative group">
+                    {photoUrl ? (
+                      <img
+                        src={photoUrl}
+                        alt="Profile"
+                        className="w-20 h-20 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-blue-400 rounded-full flex items-center justify-center text-white text-3xl font-bold">
+                        {userData.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="absolute bottom-0 right-0 bg-blue-600 rounded-full p-1.5 text-white hover:bg-blue-700 transition-colors"
+                    >
+                      <Camera className="h-3 w-3" />
+                    </button>
                   </div>
                   <div className="flex-1">
                     <h2 className="text-xl font-bold mb-1">{userData.name}</h2>
@@ -210,17 +320,15 @@ export function Profile() {
                     </div>
                   </div>
 
-                  {userData.phone && (
-                    <div className="flex items-center gap-3 text-gray-700">
-                      <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
-                        <Phone className="h-5 w-5 text-gray-600" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-xs text-gray-500">Teléfono</p>
-                        <p className="font-medium">{userData.phone}</p>
-                      </div>
+                  <div className="flex items-center gap-3 text-gray-700">
+                    <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
+                      <Phone className="h-5 w-5 text-gray-600" />
                     </div>
-                  )}
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-500">Teléfono</p>
+                      <p className="font-medium">{userData.phone || "No registrado"}</p>
+                    </div>
+                  </div>
 
                   {userData.address && (
                     <div className="flex items-center gap-3 text-gray-700">
@@ -268,12 +376,28 @@ export function Profile() {
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-white rounded-2xl shadow-lg p-8 sticky top-24"
               >
-                {/* Avatar */}
+                {/* Avatar con opción de cambiar foto */}
                 <div className="flex flex-col items-center mb-6">
-                  <div className="w-32 h-32 bg-gradient-to-br from-blue-600 to-blue-400 rounded-full flex items-center justify-center text-white text-5xl font-bold mb-4">
-                    {userData.name.charAt(0).toUpperCase()}
+                  <div className="relative group">
+                    {photoUrl ? (
+                      <img
+                        src={photoUrl}
+                        alt="Profile"
+                        className="w-32 h-32 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-32 h-32 bg-gradient-to-br from-blue-600 to-blue-400 rounded-full flex items-center justify-center text-white text-5xl font-bold">
+                        {userData.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="absolute bottom-2 right-2 bg-blue-600 rounded-full p-2 text-white hover:bg-blue-700 transition-colors"
+                    >
+                      <Camera className="h-4 w-4" />
+                    </button>
                   </div>
-                  <h2 className="text-2xl font-bold mb-1 text-center">{userData.name}</h2>
+                  <h2 className="text-2xl font-bold mb-1 text-center mt-4">{userData.name}</h2>
                   <p className="text-sm text-gray-500">{getUserTypeLabel()}</p>
                 </div>
 
@@ -303,12 +427,10 @@ export function Profile() {
                     <p className="text-xs text-gray-500 mb-1">Correo electrónico</p>
                     <p className="font-medium text-gray-700">{userData.email}</p>
                   </div>
-                  {userData.phone && (
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Teléfono</p>
-                      <p className="font-medium text-gray-700">{userData.phone}</p>
-                    </div>
-                  )}
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Teléfono</p>
+                    <p className="font-medium text-gray-700">{userData.phone || "No registrado"}</p>
+                  </div>
                   {userData.address && (
                     <div>
                       <p className="text-xs text-gray-500 mb-1">Dirección</p>
@@ -416,6 +538,94 @@ export function Profile() {
           </div>
         </div>
       </div>
+
+      {/* Input file oculto */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelect}
+        accept="image/*"
+        className="hidden"
+      />
+
+      {/* Modal para previsualizar y confirmar foto */}
+      <AnimatePresence>
+        {showPhotoModal && previewUrl && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl max-w-md w-full p-6"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold">Cambiar foto de perfil</h3>
+                <button
+                  onClick={() => {
+                    setShowPhotoModal(false);
+                    setSelectedFile(null);
+                    if (previewUrl) {
+                      URL.revokeObjectURL(previewUrl);
+                      setPreviewUrl(null);
+                    }
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="flex justify-center mb-6">
+                <img
+                  src={previewUrl}
+                  alt="Preview"
+                  className="w-40 h-40 rounded-full object-cover border-4 border-blue-600"
+                />
+              </div>
+
+              <p className="text-center text-gray-600 mb-6">
+                ¿Deseas usar esta imagen como tu foto de perfil?
+              </p>
+
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowPhotoModal(false);
+                    setSelectedFile(null);
+                    if (previewUrl) {
+                      URL.revokeObjectURL(previewUrl);
+                      setPreviewUrl(null);
+                    }
+                  }}
+                  className="flex-1 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleUploadPhoto}
+                  disabled={isUploading}
+                  className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Subiendo...
+                    </>
+                  ) : (
+                    "Guardar"
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Bottom Navigation - Mobile Only */}
       <div className="lg:hidden">

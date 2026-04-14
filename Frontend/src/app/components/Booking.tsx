@@ -513,7 +513,7 @@ export function Booking() {
 
                               <button
                                 type="button"
-                                onClick={() => navigate("/my-vehicles")}
+                                onClick={() => navigate("/Vehicles")}
                                 className="w-full p-3 bg-gray-50 border-t border-gray-100 text-blue-600 text-sm font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
                               >
                                 <Plus className="h-4 w-4" />

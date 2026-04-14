@@ -49,7 +49,7 @@ export function Login() {
       if (data.user.type === "client") {
         navigate("/home");
       } else if (data.user.type === "employee") {
-        navigate("/dashboard");
+        navigate("/admin");
       } else {
         navigate("/home");
       }

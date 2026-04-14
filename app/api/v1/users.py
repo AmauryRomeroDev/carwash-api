@@ -1,5 +1,5 @@
 # app/api/v1/users.py
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile,File
 from sqlalchemy.orm import Session, joinedload
 from datetime import datetime
 from app.database.connection import get_db
@@ -14,6 +14,9 @@ from app.schemas.user import UserUpdate, UserRead
 from app.core.security import get_password_hash
 from app.models.session import UserSession
 from app.schemas.order_service import  OrderServiceRead
+import os
+import shutil
+
 router = APIRouter()
 
 # Read ------------
@@ -21,9 +24,13 @@ router = APIRouter()
 async def get_current_user_data(current_user: User = Depends(get_current_user)):
     response = {
         "id": current_user.id,
+        "photo_url": current_user.photo_url,
         "name": current_user.name,
+        "last_name": current_user.last_name,
+        "second_last_name": current_user.second_last_name,
         "email": current_user.email,
         "type": current_user.type,
+        "phone": current_user.phone_number, 
     }
     
     if current_user.type == "employee" and current_user.employee:
@@ -32,6 +39,7 @@ async def get_current_user_data(current_user: User = Depends(get_current_user)):
         response["address"] = current_user.client.address
         
     return response
+
 # Update -----------
 @router.patch("/me", response_model=UserRead)
 def update_own_profile(
@@ -65,7 +73,47 @@ def update_own_profile(
     db.refresh(current_user)
     return current_user
 
+# Update profile photo -----------
+@router.post("/me/image")
+async def upload_profile_image(
+    file: UploadFile = File(...), 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    current_user = db.merge(current_user)
+    
+    # 1. Validación de tipo
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="El archivo debe ser una imagen")
 
+    # 2. Carpeta de destino
+    UPLOAD_DIR = "static/profile_pics"
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+    # 3. Nombre del archivo (usamos el ID para que sea único)
+    extension = os.path.splitext(file.filename)[1]
+    file_name = f"user_{current_user.id}{extension}"
+    file_path = os.path.join(UPLOAD_DIR, file_name)
+
+    # 4. Guardar archivo físico
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception:
+        raise HTTPException(status_code=500, detail="No se pudo guardar la imagen")
+
+    # 5. ACTUALIZAR TU MODELO (Usando tu campo photo_url)
+    # Guardamos la ruta relativa que empieza con /static/...
+    current_user.photo_url = f"/{file_path}" 
+    
+    db.commit()
+    db.refresh(current_user)
+    
+    return {
+        "message": "Imagen actualizada", 
+        "photo_url": current_user.photo_url
+    }
+       
 # Delete for admin ------------
 allow_admin = RoleChecker(["admin"])
 
@@ -129,7 +177,8 @@ def deactivate_my_account(
 
     db.commit()
     return None
- # Show products and services of the user -----------------
+
+# Show products and services of the user -----------------
 @router.get("/my-purchase-history", status_code=status.HTTP_200_OK)
 async def get_my_purchase_history(
     db: Session = Depends(get_db), 
@@ -183,7 +232,7 @@ async def get_my_purchase_history(
             {
                 "id": p.id,
                 "ticket_id": p.ticket_id,
-                "product_name": p.product.name if p.product else "N/A",
+                "product_name": p.product.product_name if p.product else "N/A",
                 "amount": p.amount,
                 "date": p.created_at,
                 "total": float(p.subtotal)

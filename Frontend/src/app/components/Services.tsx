@@ -13,6 +13,8 @@ interface Service {
   price: number;
   duration_minutes: number;
   is_active: boolean;
+  has_discount?: boolean;
+  discount?: number;
 }
 
 // Mapa de iconos por nombre de servicio
@@ -26,7 +28,7 @@ const getServiceIcon = (serviceName: string) => {
   return Wind;
 };
 
-// Características predefinidas por tipo de servicio (para mantener el diseño)
+// Características predefinidas por tipo de servicio
 const getServiceFeatures = (serviceName: string): string[] => {
   const name = serviceName.toLowerCase();
   if (name.includes("básico") || name.includes("basico")) {
@@ -167,6 +169,22 @@ export function Services() {
     return `${minutes}min`;
   };
 
+  const handleBooking = (service: Service) => {
+    // Guardar el servicio seleccionado en localStorage para que Booking lo pueda cargar
+    const selectedServices = [{
+      id: service.id,
+      name: service.service_name,
+      price: service.price,
+      originalPrice: service.price,
+      discount: service.discount || 0,
+      hasDiscount: service.has_discount || false,
+    }];
+    localStorage.setItem("selected_services", JSON.stringify(selectedServices));
+    
+    // Navegar a la página de booking
+    navigate("/booking");
+  };
+
   if (isLoading) {
     return (
       <>
@@ -236,6 +254,9 @@ export function Services() {
             const Icon = getServiceIcon(service.service_name);
             const features = getServiceFeatures(service.service_name);
             const image = getServiceImage(service.service_name);
+            const finalPrice = service.has_discount && service.discount 
+              ? service.price * (1 - service.discount / 100)
+              : service.price;
             
             return (
               <motion.div
@@ -278,9 +299,20 @@ export function Services() {
                   <div className="flex gap-4 mb-6">
                     <div className="bg-green-50 px-4 py-2 rounded-lg">
                       <p className="text-sm text-green-600 font-medium">Precio</p>
-                      <p className="text-2xl font-bold text-green-700">
-                        {formatPrice(service.price)}
-                      </p>
+                      {service.has_discount && service.discount ? (
+                        <div>
+                          <p className="text-2xl font-bold text-green-700">
+                            {formatPrice(finalPrice)}
+                          </p>
+                          <p className="text-xs text-gray-400 line-through">
+                            {formatPrice(service.price)}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-2xl font-bold text-green-700">
+                          {formatPrice(service.price)}
+                        </p>
+                      )}
                     </div>
                     <div className="bg-blue-50 px-4 py-2 rounded-lg">
                       <p className="text-sm text-blue-600 font-medium">Duración</p>
@@ -289,6 +321,13 @@ export function Services() {
                       </p>
                     </div>
                   </div>
+
+                  {/* Discount badge */}
+                  {service.has_discount && service.discount && (
+                    <div className="mb-4 inline-flex items-center gap-2 bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-medium">
+                      🔥 {service.discount}% DE DESCUENTO
+                    </div>
+                  )}
 
                   <ul className="space-y-3">
                     {features.map((feature, featureIndex) => (
@@ -301,9 +340,9 @@ export function Services() {
                     ))}
                   </ul>
 
-                  {/* Booking Button */}
+                  {/* Booking Button - Ahora redirige con el servicio seleccionado */}
                   <button 
-                    onClick={() => navigate(`/booking/${service.id}`)}
+                    onClick={() => handleBooking(service)}
                     className="mt-8 bg-blue-600 text-white px-8 py-3 rounded-full font-semibold hover:bg-blue-700 transition-colors shadow-lg"
                   >
                     Reservar Ahora

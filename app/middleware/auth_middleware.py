@@ -21,6 +21,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             "/api/v1/auth/login",
             "/api/v1/auth/register/client",
             "/api/v1/auth/register/employee",
+            "/static",
             "/docs",
             "/redoc",
             "/openapi.json",

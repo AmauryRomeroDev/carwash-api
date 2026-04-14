@@ -13,6 +13,12 @@ from app.schemas.auth import LoginRequest
 from app.models.session import UserSession
 from app.core.security import get_password_hash, verify_password, create_access_token
 
+import shutil
+import os
+
+UPLOAD_DIR = "uploads/profile_photos"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
 def get_db():
     db = SessionLocal()
     try: 
@@ -27,6 +33,14 @@ def register_employee(data: EmployeeCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="El email ya está registrado")
 
+    file_path = None
+    if data.photo_url:
+        file_name = f"{data.email}_{data.photo_url.filename}"
+        file_path = os.path.join(UPLOAD_DIR, file_name)
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(data.photo_url.file, buffer)
+        
     
     new_user = User(
         name=data.name,
@@ -35,6 +49,7 @@ def register_employee(data: EmployeeCreate, db: Session = Depends(get_db)):
         phone_number=data.phone, 
         email=data.email,
         password=get_password_hash(data.password),
+        photo_url=file_path,
         type="employee"
     )
     db.add(new_user)
@@ -54,6 +69,14 @@ def register_client(data: ClientCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="El email ya está registrado")
 
     # En ClientCreate, heredas de UserMinimalRead o UserBase
+    file_path = None
+    if data.photo_url:
+        file_name = f"{data.email}_{data.photo_url.filename}"
+        file_path = os.path.join(UPLOAD_DIR, file_name)
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(data.photo_url.file, buffer)
+        
     # Asegúrate de capturar todos los campos necesarios para el modelo User
     new_user = User(
         name=data.name,
@@ -61,7 +84,8 @@ def register_client(data: ClientCreate, db: Session = Depends(get_db)):
         second_last_name=data.second_last_name,
         phone_number=data.phone,
         email=data.email,
-        password=get_password_hash(data.password), # Si el cliente crea cuenta con pass
+        password=get_password_hash(data.password),
+        photo_url=file_path,
         type="client"
     )
     db.add(new_user)
