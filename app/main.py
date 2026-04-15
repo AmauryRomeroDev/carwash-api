@@ -5,11 +5,31 @@ from app.middleware.auth_middleware import AuthMiddleware
 from app.core.dependencies import oauth2_scheme
 from fastapi.middleware.cors import CORSMiddleware
 import os
+import sys
+import logging
 from dotenv import load_dotenv
 
 # Configuración inicial
 
 load_dotenv()
+
+# Determinar nivel de log según variable de entorno (default: INFO)
+DEBUG_MODE = os.getenv("DEBUG", "false").lower() == "true"
+LOG_LEVEL = logging.DEBUG if DEBUG_MODE else logging.INFO
+
+# Configurar el formato y el destino (Consola + Archivo)
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout),           # Log a consola
+        logging.FileHandler("app_log.log", mode="a")  # Log a archivo
+    ]
+)
+
+logger = logging.getLogger("carwash_api")
+logger.info(f"Iniciando API en modo: {'DEBUG' if DEBUG_MODE else 'PROD'}")
+
 
 app = FastAPI(
     title="Carwash API", 

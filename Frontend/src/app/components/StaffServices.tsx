@@ -90,7 +90,7 @@ export function StaffServices() {
     
     try {
       const response = await fetch(
-        `http://localhost:8000/api/v1/services?is_active=${showActiveOnly}`,
+        `http://localhost:8000/api/v1/staff/services`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -131,7 +131,7 @@ export function StaffServices() {
     const token = localStorage.getItem("access_token");
     
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/services/${orderId}`, {
+      const response = await fetch(`http://localhost:8000/api/v1/staff/services/${orderId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -151,7 +151,7 @@ export function StaffServices() {
     const token = localStorage.getItem("access_token");
     
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/services/${orderId}`, {
+      const response = await fetch(`http://localhost:8000/api/v1/staff/services/${orderId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -218,8 +218,8 @@ export function StaffServices() {
   };
 
   const getClientName = (order: ServiceOrder) => {
-    if (order.client?.user?.name) {
-      return `${order.client.user.name} ${order.client.user.last_name || ''}`;
+    if (order.client?.user?.email) {
+      return `${order.client.user.email}`;
     }
     return "Cliente no registrado";
   };

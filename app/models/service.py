@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer,String, Boolean, DateTime, ForeignKey, func,DECIMAL
+from sqlalchemy import Column, Integer,String, Boolean, DateTime, ForeignKey, func,DECIMAL,Float
 from sqlalchemy.orm import relationship
 from app.database.connection import Base
 
@@ -8,12 +8,11 @@ class Service(Base):
     id = Column(Integer, primary_key=True, index=True)
     service_name=Column(String(100), nullable=False)
     description=Column(String(100), nullable=False)
-    price=Column("total",DECIMAL(10,2), nullable=False)
-    
+    price=Column(DECIMAL(10,2), nullable=False)
+    total= Column(DECIMAL(10,2),nullable=False)
     discount = Column(Integer, default=0) 
     has_discount = Column(Boolean, default=False) 
     duration_minutes=Column(Integer, nullable=False)
-    
     is_active = Column(Boolean, default=True) 
     
     created_at = Column(DateTime, nullable=False, server_default=func.now())

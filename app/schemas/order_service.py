@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 from .service import ServiceMinimalRead
 from .vehicle import VehicleRead
+from .client import ClientMinimalRead
 
 class OrderServiceBase(BaseModel):
     ticket_id: int
@@ -43,6 +44,8 @@ class OrderServiceRead(OrderServiceBase):
     washer_id: Optional[int] = Field(None)
     casher_id: Optional[int] = Field(None)
     service: ServiceMinimalRead
+    client:Optional[ClientMinimalRead]
+    vehicle: Optional[VehicleRead]
     delivery_time: Optional[datetime] = None
     notes: Optional[str]
     start_time: Optional[datetime]=Field(default_factory=lambda:datetime.now(timezone.utc))

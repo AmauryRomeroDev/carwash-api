@@ -28,7 +28,7 @@ class EmployeeCreate(EmployeeBase):
     phone: str = Field(..., pattern=r"^\+?\d{10,15}$")
     email: str = Field(..., pattern=r'^[\w\.-]+@[\w\.-]+\.\w+$')
     password: str = Field(..., min_length=6, max_length=255)
-
+    photo_url: Optional[str] = None
 
 # Para actualizar empleado - todos los campos opcionales
 class EmployeeUpdate(BaseModel):

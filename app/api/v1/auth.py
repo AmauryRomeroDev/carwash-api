@@ -33,14 +33,7 @@ def register_employee(data: EmployeeCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="El email ya está registrado")
 
-    file_path = None
-    if data.photo_url:
-        file_name = f"{data.email}_{data.photo_url.filename}"
-        file_path = os.path.join(UPLOAD_DIR, file_name)
-        
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(data.photo_url.file, buffer)
-        
+    file_path = data.photo_url if data.photo_url else None        
     
     new_user = User(
         name=data.name,
@@ -69,14 +62,7 @@ def register_client(data: ClientCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="El email ya está registrado")
 
     # En ClientCreate, heredas de UserMinimalRead o UserBase
-    file_path = None
-    if data.photo_url:
-        file_name = f"{data.email}_{data.photo_url.filename}"
-        file_path = os.path.join(UPLOAD_DIR, file_name)
-        
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(data.photo_url.file, buffer)
-        
+    file_path = data.photo_url if data.photo_url else None
     # Asegúrate de capturar todos los campos necesarios para el modelo User
     new_user = User(
         name=data.name,

@@ -1,22 +1,29 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 
 from app.database.connection import get_db
 from app.core.dependencies import get_current_user, RoleChecker
 from app.models.service import Service
 from app.schemas.service import ServiceCreate, ServiceRead, ServiceUpdate
-
+from app.models.order_service import OrderService
 router = APIRouter()
 
 # Permiso: Solo Administradores (Employee con rol admin)
 allow_admin = RoleChecker(["admin"])
 
 # READ ALL -----------------
-@router.get("/", response_model=List[ServiceRead])
-def list_services(db: Session = Depends(get_db)):
-    """Lista todos los servicios activos del catálogo"""
-    return db.query(Service).all()
+@router.get("/", response_model=List[OrderServiceRead])
+def list_orders(db: Session = Depends(get_db)):
+    """Lista órdenes con toda la info anidada"""
+    return db.query(OrderService).options(
+        # JOIN Orden -> Cliente -> Usuario (para sacar el email)
+        joinedload(OrderService.client).joinedload(ClientModel.user),
+        # JOIN Orden -> Servicio
+        joinedload(OrderService.service),
+        # JOIN Orden -> Vehículo
+        joinedload(OrderService.vehicle)
+    ).all()
 
 # Read One -----------------------------------
 @router.get("/{service_id}", response_model=ServiceRead)
