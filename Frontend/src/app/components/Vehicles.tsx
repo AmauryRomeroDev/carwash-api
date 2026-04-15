@@ -50,33 +50,55 @@ export function Vehicles() {
     }
     fetchUserData();
   }, [navigate]);
+// In your Vehicles.tsx, modify the fetchUserData function
+const fetchUserData = async () => {
+  const token = localStorage.getItem("access_token");
 
-  const fetchUserData = async () => {
-    const token = localStorage.getItem("access_token");
+  try {
+    const response = await fetch("http://localhost:8000/api/v1/users/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-    try {
-      const response = await fetch("http://localhost:8000/api/v1/users/me", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          localStorage.clear();
-          navigate("/");
-          return;
-        }
-        throw new Error("Error al cargar datos del usuario");
+    if (!response.ok) {
+      if (response.status === 401) {
+        localStorage.clear();
+        navigate("/");
+        return;
       }
-
-      const data = await response.json();
-      setUserData(data);
-      await fetchVehicles();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error de conexión");
-    } finally {
-      setIsLoading(false);
+      throw new Error("Error al cargar datos del usuario");
     }
-  };
+
+    const data = await response.json();
+    setUserData(data);
+    
+    // IMPORTANT: Also fetch the client profile to get the actual client_id
+    await fetchClientProfile();
+    await fetchVehicles();
+  } catch (err) {
+    setError(err instanceof Error ? err.message : "Error de conexión");
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+// Add this new function to fetch client profile
+const fetchClientProfile = async () => {
+  const token = localStorage.getItem("access_token");
+  
+  try {
+    const response = await fetch("http://localhost:8000/api/v1/users/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    
+    if (response.ok) {
+      const clientData = await response.json();
+      // Store the actual client_id (from the Client table)
+      localStorage.setItem("client_id", clientData.id.toString());
+    }
+  } catch (err) {
+    console.error("Error fetching client profile:", err);
+  }
+};
 
   const fetchVehicles = async () => {
     const token = localStorage.getItem("access_token");

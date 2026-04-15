@@ -31,13 +31,25 @@ def create_vehicle(
         if not data.client_id or data.client_id == 0:
             raise HTTPException(status_code=400, detail="Como Admin, debes especificar un ID de cliente válido (distinto de 0)")
         
-        target_client_id = data.client_id
+        # El admin puede enviar user_id o client_id
+        target_client_id = resolve_client_id(db, data.client_id)
+        if not target_client_id:
+            raise HTTPException(status_code=400, detail=f"No se encontró un cliente con ID {data.client_id}")
     
     # CASO: CLIENTE
     elif current_user.type == "client":
         if not current_user.client:
             raise HTTPException(status_code=400, detail="Tu perfil de cliente no existe en la base de datos")
-        target_client_id = current_user.client.id
+        
+        # Si el cliente envió un client_id, verificar que sea el suyo
+        if data.client_id:
+            resolved_id = resolve_client_id(db, data.client_id)
+            if resolved_id != current_user.client.id:
+                raise HTTPException(status_code=403, detail="No puedes registrar vehículos para otro cliente")
+            target_client_id = resolved_id
+        else:
+            # Si no envió nada, usar su propio client_id
+            target_client_id = current_user.client.id
     
     else:
         raise HTTPException(status_code=403, detail="Tipo de usuario no autorizado")
@@ -62,21 +74,38 @@ def create_vehicle(
         )
         db.add(new_vehicle)
         db.commit()
-        db.refresh(new_vehicle) # Aquí ya obtenemos el ID generado
+        db.refresh(new_vehicle)
     except Exception as e:
         db.rollback()
         print(f"DEBUG ERROR DB: {e}")
         raise HTTPException(status_code=500, detail="Error de integridad al guardar el vehículo")
 
-    # 4. Retornar con las relaciones cargadas (Joinedload)
-    # Buscamos el objeto recién creado para incluir los datos del Cliente y Usuario
+    # 4. Retornar con las relaciones cargadas
     result = db.query(Vehicle).options(
         joinedload(Vehicle.client).joinedload(Client.user)
     ).filter(Vehicle.id == new_vehicle.id).first()
 
     return result
 
-
+# Función auxiliar para resolver client_id desde user_id o client_id
+def resolve_client_id(db: Session, id_value: int) -> int | None:
+    """
+    Convierte un user_id o client_id al client_id real.
+    Si el id_value corresponde a un user_id, busca el client asociado.
+    Si el id_value ya es un client_id, lo valida y retorna.
+    """
+    # Primero, intentar buscar como client_id
+    client = db.query(Client).filter(Client.id == id_value).first()
+    if client:
+        return client.id
+    
+    # Si no, intentar buscar como user_id
+    client_by_user = db.query(Client).filter(Client.user_id == id_value).first()
+    if client_by_user:
+        return client_by_user.id
+    
+    # No se encontró ningún cliente
+    return None
 
 # Read client vehicles ------------------
 @router.get("/me", response_model=List[VehicleRead])
@@ -115,8 +144,6 @@ def get_vehicle_by_id(
         raise HTTPException(status_code=403, detail="No tienes permiso para ver este vehículo")
         
     return vehicle
-
-
 
 # Update---------------------------------------------
 @router.patch("/{vehicle_id}", response_model=VehicleRead)
@@ -159,7 +186,6 @@ def update_vehicle(
         joinedload(Vehicle.client).joinedload(Client.user)
     ).filter(Vehicle.id == vehicle.id).first()
 
-
 # DELETE VEHICLE ------------------------------
 @router.delete("/{vehicle_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_vehicle(
@@ -190,4 +216,4 @@ def delete_vehicle(
     db.delete(vehicle)
     db.commit()
     
-    return None 
+    return None

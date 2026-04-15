@@ -22,7 +22,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # 1. Rutas públicas (sin autenticación)
         EXCLUDED_PATHS = [
             "/api/v1/auth/login",
-            "/api/v1/auth/register/client",
+            "/api/v1/auth/register",
             "/api/v1/auth/register/employee",
             "/static",
             "/docs",

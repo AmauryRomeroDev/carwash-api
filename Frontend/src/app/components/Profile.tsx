@@ -1,6 +1,28 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
-import { User, Mail, Phone, MapPin, Settings, LogOut, Bell, HelpCircle, Shield, ChevronRight, Star, ShoppingBag, Car, Edit2, Ticket, Calendar, Camera, X, Loader2 } from "lucide-react";
+import {
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Settings,
+  LogOut,
+  Bell,
+  HelpCircle,
+  Shield,
+  ChevronRight,
+  Star,
+  ShoppingBag,
+  Car,
+  Edit2,
+  Ticket,
+  Calendar,
+  Camera,
+  X,
+  Loader2,
+  Users,
+  ClipboardList,
+} from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { BottomNav } from "./BottomNav";
 import { TopNav } from "./TopNav";
@@ -79,7 +101,7 @@ export function Profile() {
 
   const handleLogout = async () => {
     const token = localStorage.getItem("access_token");
-    
+
     try {
       if (token) {
         await fetch("http://localhost:8000/api/v1/users/logout", {
@@ -101,13 +123,11 @@ export function Profile() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validar tipo de archivo
     if (!file.type.startsWith("image/")) {
       setError("Por favor selecciona una imagen válida");
       return;
     }
 
-    // Validar tamaño (máximo 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setError("La imagen no debe superar los 5MB");
       return;
@@ -131,13 +151,16 @@ export function Profile() {
     formData.append("file", selectedFile);
 
     try {
-      const response = await fetch("http://localhost:8000/api/v1/users/me/image", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const response = await fetch(
+        "http://localhost:8000/api/v1/users/me/image",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
         },
-        body: formData,
-      });
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -145,23 +168,20 @@ export function Profile() {
       }
 
       const data = await response.json();
-      
-      // Actualizar la foto de perfil en el estado
-      setUserData(prev => ({
+
+      setUserData((prev) => ({
         ...prev,
         photo_url: data.photo_url,
       }));
-      
+
       setShowPhotoModal(false);
       setSelectedFile(null);
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
         setPreviewUrl(null);
       }
-      
-      // Recargar datos del usuario para asegurar consistencia
+
       await fetchUserData();
-      
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error de conexión");
     } finally {
@@ -171,7 +191,6 @@ export function Profile() {
 
   const getPhotoUrl = () => {
     if (userData.photo_url) {
-      // Si la URL es relativa, añadir el host
       if (userData.photo_url.startsWith("/")) {
         return `http://localhost:8000${userData.photo_url}`;
       }
@@ -184,22 +203,151 @@ export function Profile() {
     fetchUserData();
   }, [navigate]);
 
-  const quickActions = [
-    { icon: Car, label: "Mis Vehículos", path: "/vehicles", color: "text-blue-600", bg: "bg-blue-50" },
-    { icon: Ticket, label: "Mis Tickets", path: "/tickets", color: "text-indigo-600", bg: "bg-indigo-50" },
-    { icon: Calendar, label: "Mis Reservas", path: "/my-bookings", color: "text-purple-600", bg: "bg-purple-50" },
-    { icon: Star, label: "Mis Reseñas", path: "/reviews", color: "text-yellow-600", bg: "bg-yellow-50" },
-    { icon: ShoppingBag, label: "Productos", path: "/products", color: "text-green-600", bg: "bg-green-50" },
-  ];
+  interface QuickAction {
+    icon: any;
+    label: string;
+    path: string;
+    color: string;
+    bg: string;
+    description?: string;
+  }
 
-  const adminAction = { icon: Shield, label: "Panel Admin", path: "/admin", color: "text-purple-600", bg: "bg-purple-50" };
-  const allQuickActions = userData.role === "admin" ? [...quickActions, adminAction] : quickActions;
+  // Definir acciones según el rol del usuario
+  const getQuickActions = (): QuickAction[] => {
+    const isAdmin = userData.role === "admin";
+
+    if (isAdmin) {
+      // Para ADMIN: solo tickets staff y reservas staff
+      return [
+        {
+          icon: Ticket,
+          label: "Tickets (Staff)",
+          path: "/staff/tickets",
+          color: "text-indigo-600",
+          bg: "bg-indigo-50",
+          description: "Gestionar tickets de clientes",
+        },
+        {
+          icon: Calendar,
+          label: "Reservas (Staff)",
+          path: "/staff/bookings",
+          color: "text-purple-600",
+          bg: "bg-purple-50",
+          description: "Administrar reservas",
+        },
+        {
+          icon: Users,
+          label: "Clientes",
+          path: "/admin/clients",
+          color: "text-green-600",
+          bg: "bg-green-50",
+          description: "Gestionar clientes",
+        },
+        {
+          icon: ClipboardList,
+          label: "Reportes",
+          path: "/admin/reports",
+          color: "text-orange-600",
+          bg: "bg-orange-50",
+          description: "Ver reportes del sistema",
+        },
+      ];
+    }
+
+    // Para CLIENTES: todos los acciones normales
+    return [
+      {
+        icon: Car,
+        label: "Mis Vehículos",
+        path: "/vehicles",
+        color: "text-blue-600",
+        bg: "bg-blue-50",
+      },
+      {
+        icon: Ticket,
+        label: "Mis Tickets",
+        path: "/tickets",
+        color: "text-indigo-600",
+        bg: "bg-indigo-50",
+      },
+      {
+        icon: Calendar,
+        label: "Mis Reservas",
+        path: "/my-bookings",
+        color: "text-purple-600",
+        bg: "bg-purple-50",
+      },
+      {
+        icon: Star,
+        label: "Mis Reseñas",
+        path: "/reviews",
+        color: "text-yellow-600",
+        bg: "bg-yellow-50",
+      },
+      {
+        icon: ShoppingBag,
+        label: "Productos",
+        path: "/products",
+        color: "text-green-600",
+        bg: "bg-green-50",
+      },
+    ];
+  };
+
+  // Acción específica para panel admin (solo para admins)
+  const getAdminPanelAction = () => {
+    if (userData.role === "admin") {
+      return {
+        icon: Shield,
+        label: "Panel Admin",
+        path: "/admin",
+        color: "text-purple-600",
+        bg: "bg-purple-50",
+        description: "Configuración del sistema",
+      };
+    }
+    return null;
+  };
+
+  const quickActions = getQuickActions();
+  const adminAction = getAdminPanelAction();
+  const allQuickActions = adminAction
+    ? [...quickActions, adminAction]
+    : quickActions;
 
   const menuItems = [
-    { icon: Settings, label: "Configuración", description: "Ajusta tus preferencias", color: "text-blue-600", bg: "bg-blue-50", path: "/profile/settings" },
-    { icon: Bell, label: "Notificaciones", description: "Gestiona alertas", color: "text-purple-600", bg: "bg-purple-50", path: "/profile/notifications" },
-    { icon: Shield, label: "Privacidad", description: "Seguridad de datos", color: "text-gray-600", bg: "bg-gray-50", path: "/profile/privacy" },
-    { icon: HelpCircle, label: "Ayuda y Soporte", description: "Obtén asistencia", color: "text-orange-600", bg: "bg-orange-50", path: "/profile/support" },
+    {
+      icon: Settings,
+      label: "Configuración",
+      description: "Ajusta tus preferencias",
+      color: "text-blue-600",
+      bg: "bg-blue-50",
+      path: "/profile/settings",
+    },
+    {
+      icon: Bell,
+      label: "Notificaciones",
+      description: "Gestiona alertas",
+      color: "text-purple-600",
+      bg: "bg-purple-50",
+      path: "/profile/notifications",
+    },
+    {
+      icon: Shield,
+      label: "Privacidad",
+      description: "Seguridad de datos",
+      color: "text-gray-600",
+      bg: "bg-gray-50",
+      path: "/profile/privacy",
+    },
+    {
+      icon: HelpCircle,
+      label: "Ayuda y Soporte",
+      description: "Obtén asistencia",
+      color: "text-orange-600",
+      bg: "bg-orange-50",
+      path: "/profile/support",
+    },
   ];
 
   const getUserTypeLabel = () => {
@@ -246,6 +394,7 @@ export function Profile() {
   }
 
   const photoUrl = getPhotoUrl();
+  const isAdmin = userData.role === "admin";
 
   return (
     <>
@@ -259,7 +408,9 @@ export function Profile() {
         <div className="lg:hidden bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 pt-12 pb-24 rounded-b-3xl">
           <div className="max-w-md mx-auto">
             <h1 className="text-2xl font-bold mb-2">Mi Perfil</h1>
-            <p className="text-blue-100 text-sm">Administra tu cuenta y preferencias</p>
+            <p className="text-blue-100 text-sm">
+              Administra tu cuenta y preferencias
+            </p>
           </div>
         </div>
 
@@ -267,7 +418,9 @@ export function Profile() {
         <div className="hidden lg:block bg-gradient-to-r from-blue-600 to-blue-700 text-white">
           <div className="max-w-7xl mx-auto px-6 py-12">
             <h1 className="text-4xl font-bold mb-4">Mi Perfil</h1>
-            <p className="text-xl text-blue-100">Administra tu cuenta y preferencias</p>
+            <p className="text-xl text-blue-100">
+              Administra tu cuenta y preferencias
+            </p>
           </div>
         </div>
 
@@ -304,7 +457,9 @@ export function Profile() {
                   </div>
                   <div className="flex-1">
                     <h2 className="text-xl font-bold mb-1">{userData.name}</h2>
-                    <p className="text-sm text-gray-500">{getUserTypeLabel()}</p>
+                    <p className="text-sm text-gray-500">
+                      {getUserTypeLabel()}
+                    </p>
                   </div>
                 </div>
 
@@ -326,7 +481,9 @@ export function Profile() {
                     </div>
                     <div className="flex-1">
                       <p className="text-xs text-gray-500">Teléfono</p>
-                      <p className="font-medium">{userData.phone || "No registrado"}</p>
+                      <p className="font-medium">
+                        {userData.phone || "No registrado"}
+                      </p>
                     </div>
                   </div>
 
@@ -352,21 +509,27 @@ export function Profile() {
                 </button>
               </motion.div>
 
-              {/* Stats - Mobile */}
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="bg-white rounded-2xl p-4 text-center shadow-sm">
-                  <p className="text-2xl font-bold text-blue-600 mb-1">8</p>
-                  <p className="text-xs text-gray-600">Servicios</p>
+              {/* Stats - Mobile (solo para clientes) */}
+              {!isAdmin && (
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="bg-white rounded-2xl p-4 text-center shadow-sm">
+                    <p className="text-2xl font-bold text-blue-600 mb-1">8</p>
+                    <p className="text-xs text-gray-600">Servicios</p>
+                  </div>
+                  <div className="bg-white rounded-2xl p-4 text-center shadow-sm">
+                    <p className="text-2xl font-bold text-green-600 mb-1">
+                      $240
+                    </p>
+                    <p className="text-xs text-gray-600">Ahorrado</p>
+                  </div>
+                  <div className="bg-white rounded-2xl p-4 text-center shadow-sm">
+                    <p className="text-2xl font-bold text-yellow-600 mb-1">
+                      5.0
+                    </p>
+                    <p className="text-xs text-gray-600">Rating</p>
+                  </div>
                 </div>
-                <div className="bg-white rounded-2xl p-4 text-center shadow-sm">
-                  <p className="text-2xl font-bold text-green-600 mb-1">$240</p>
-                  <p className="text-xs text-gray-600">Ahorrado</p>
-                </div>
-                <div className="bg-white rounded-2xl p-4 text-center shadow-sm">
-                  <p className="text-2xl font-bold text-yellow-600 mb-1">5.0</p>
-                  <p className="text-xs text-gray-600">Rating</p>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Desktop Left Column - Profile Info */}
@@ -397,25 +560,33 @@ export function Profile() {
                       <Camera className="h-4 w-4" />
                     </button>
                   </div>
-                  <h2 className="text-2xl font-bold mb-1 text-center mt-4">{userData.name}</h2>
+                  <h2 className="text-2xl font-bold mb-1 text-center mt-4">
+                    {userData.name}
+                  </h2>
                   <p className="text-sm text-gray-500">{getUserTypeLabel()}</p>
                 </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-3 mb-6 pb-6 border-b border-gray-200">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-blue-600 mb-1">8</p>
-                    <p className="text-xs text-gray-600">Servicios</p>
+                {/* Stats - Desktop (solo para clientes) */}
+                {!isAdmin && (
+                  <div className="grid grid-cols-3 gap-3 mb-6 pb-6 border-b border-gray-200">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-blue-600 mb-1">8</p>
+                      <p className="text-xs text-gray-600">Servicios</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-green-600 mb-1">
+                        $240
+                      </p>
+                      <p className="text-xs text-gray-600">Ahorrado</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-yellow-600 mb-1">
+                        5.0
+                      </p>
+                      <p className="text-xs text-gray-600">Rating</p>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-green-600 mb-1">$240</p>
-                    <p className="text-xs text-gray-600">Ahorrado</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-yellow-600 mb-1">5.0</p>
-                    <p className="text-xs text-gray-600">Rating</p>
-                  </div>
-                </div>
+                )}
 
                 {/* User Info */}
                 <div className="space-y-4 mb-6">
@@ -424,17 +595,25 @@ export function Profile() {
                     <p className="font-medium text-gray-700">{userData.name}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">Correo electrónico</p>
-                    <p className="font-medium text-gray-700">{userData.email}</p>
+                    <p className="text-xs text-gray-500 mb-1">
+                      Correo electrónico
+                    </p>
+                    <p className="font-medium text-gray-700">
+                      {userData.email}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Teléfono</p>
-                    <p className="font-medium text-gray-700">{userData.phone || "No registrado"}</p>
+                    <p className="font-medium text-gray-700">
+                      {userData.phone || "No registrado"}
+                    </p>
                   </div>
                   {userData.address && (
                     <div>
                       <p className="text-xs text-gray-500 mb-1">Dirección</p>
-                      <p className="font-medium text-gray-700">{userData.address}</p>
+                      <p className="font-medium text-gray-700">
+                        {userData.address}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -467,20 +646,38 @@ export function Profile() {
                 className="bg-white rounded-2xl shadow-sm overflow-hidden"
               >
                 <div className="p-6 border-b border-gray-100">
-                  <h3 className="font-semibold text-lg">Acciones Rápidas</h3>
+                  <h3 className="font-semibold text-lg">
+                    {isAdmin ? "Panel de Administración" : "Acciones Rápidas"}
+                  </h3>
+                  {isAdmin && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      Gestión de tickets y reservas como staff
+                    </p>
+                  )}
                 </div>
                 <div className="divide-y divide-gray-100">
                   {allQuickActions.map((item, index) => (
                     <button
                       key={index}
-                      className="w-full flex items-center gap-4 p-6 hover:bg-gray-50 transition-colors"
+                      className="w-full flex items-center gap-4 p-6 hover:bg-gray-50 transition-colors text-left"
                       onClick={() => navigate(item.path)}
                     >
-                      <div className={`w-12 h-12 ${item.bg} rounded-xl flex items-center justify-center`}>
+                      <div
+                        className={`w-12 h-12 ${item.bg} rounded-xl flex items-center justify-center flex-shrink-0`}
+                      >
                         <item.icon className={`h-6 w-6 ${item.color}`} />
                       </div>
-                      <span className="flex-1 text-left font-medium text-gray-700 text-lg">{item.label}</span>
-                      <ChevronRight className="h-5 w-5 text-gray-400" />
+                      <div className="flex-1">
+                        <span className="font-medium text-gray-700 text-lg block">
+                          {item.label}
+                        </span>
+                        {item.description && (
+                          <span className="text-sm text-gray-500 block">
+                            {item.description}
+                          </span>
+                        )}
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
                     </button>
                   ))}
                 </div>
@@ -500,21 +697,27 @@ export function Profile() {
                   {menuItems.map((item, index) => (
                     <button
                       key={index}
-                      className="w-full flex items-center gap-4 p-6 hover:bg-gray-50 transition-colors"
+                      className="w-full flex items-center gap-4 p-6 hover:bg-gray-50 transition-colors text-left"
                       onClick={() => {
                         if (item.path) {
                           navigate(item.path);
                         }
                       }}
                     >
-                      <div className={`w-12 h-12 ${item.bg} rounded-xl flex items-center justify-center`}>
+                      <div
+                        className={`w-12 h-12 ${item.bg} rounded-xl flex items-center justify-center flex-shrink-0`}
+                      >
                         <item.icon className={`h-6 w-6 ${item.color}`} />
                       </div>
-                      <div className="flex-1 text-left">
-                        <p className="font-medium text-gray-700 text-lg">{item.label}</p>
-                        <p className="text-sm text-gray-500">{item.description}</p>
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-700 text-lg">
+                          {item.label}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {item.description}
+                        </p>
                       </div>
-                      <ChevronRight className="h-5 w-5 text-gray-400" />
+                      <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
                     </button>
                   ))}
                 </div>

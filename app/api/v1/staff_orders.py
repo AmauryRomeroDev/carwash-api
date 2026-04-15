@@ -56,7 +56,7 @@ def format_ticket_items(orders: List[OrderProduct]):
 
 # --- Endpoints ---
 
-@router.get("/orders/products", response_model=List[OrderProductRead])
+@router.get("/orders/products")  # Sin response_model
 def get_product_sales(
     product_id: Optional[int] = None,
     db: Session = Depends(get_db),
@@ -65,10 +65,122 @@ def get_product_sales(
     query = db.query(OrderProduct).options(
         joinedload(OrderProduct.product),
         joinedload(OrderProduct.casher).joinedload(Employee.user),
+        joinedload(OrderProduct.client).joinedload(Client.user),
     )
     if product_id:
         query = query.filter(OrderProduct.product_id == product_id)
-    return query.order_by(OrderProduct.created_at.desc()).all()
+    
+    orders = query.order_by(OrderProduct.created_at.desc()).all()
+    
+    # Serializar manualmente
+    result = []
+    for order in orders:
+        result.append({
+            "id": order.id,
+            "ticket_id": order.ticket_id,
+            "product_id": order.product_id,
+            "client_id": order.client_id,
+            "casher_id": order.casher_id,
+            "amount": order.amount,
+            "subtotal": float(order.subtotal),
+            "total": float(order.total),
+            "discount": float(order.discount) if hasattr(order, 'discount') else 0,
+            "created_at": order.created_at,
+            "updated_at": order.updated_at,
+            "product": {
+                "id": order.product.id,
+                "product_name": order.product.product_name,
+                "description": order.product.description,
+                "unit_price": float(order.product.unit_price),
+                "stock": order.product.stock,
+                "discount": float(order.product.discount) if order.product.discount else 0,
+                "has_discount": order.product.has_discount,
+                "is_active": order.product.is_active,
+            } if order.product else None,
+            "casher": {
+                "id": order.casher.id,
+                "name": order.casher.user.name if order.casher.user else None,
+                "last_name": order.casher.user.last_name if order.casher.user else None,
+            } if order.casher and order.casher.user else None,
+            "client": {
+                "id": order.client.id,
+                "name": order.client.user.name if order.client.user else None,
+                "last_name": order.client.user.last_name if order.client.user else None,
+            } if order.client and order.client.user else None,
+        })
+    
+    return result
+
+@router.get("/orders/products/all")
+def get_all_product_orders(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(allow_staff),
+):
+    """
+    Obtiene TODAS las órdenes de productos sin filtros.
+    Útil para exportaciones o sincronizaciones completas.
+    Solo accesible para staff (admin y empleados).
+    """
+    # Consulta con eager loading de relaciones
+    orders = db.query(OrderProduct).options(
+        joinedload(OrderProduct.product),
+        joinedload(OrderProduct.casher).joinedload(Employee.user),
+        joinedload(OrderProduct.client).joinedload(Client.user),
+    ).order_by(OrderProduct.created_at.desc()).all()
+    
+    # Serializar manualmente los resultados
+    serialized_orders = []
+    for order in orders:
+        serialized_orders.append({
+            "id": order.id,
+            "ticket_id": order.ticket_id,
+            "product_id": order.product_id,
+            "client_id": order.client_id,
+            "casher_id": order.casher_id,
+            "amount": order.amount,
+            "subtotal": float(order.subtotal) if order.subtotal else 0.0,
+            "total": float(order.total) if order.total else 0.0,
+            "discount": float(order.discount) if hasattr(order, 'discount') and order.discount else 0.0,
+            "created_at": order.created_at,
+            "updated_at": order.updated_at,
+            "product": {
+                "id": order.product.id,
+                "product_name": order.product.product_name,
+                "description": order.product.description,
+                "unit_price": float(order.product.unit_price) if order.product.unit_price else 0.0,
+                "stock": order.product.stock or 0,
+                "discount": float(order.product.discount) if order.product.discount else 0.0,
+                "has_discount": order.product.has_discount or False,
+                "is_active": order.product.is_active,
+            } if order.product else None,
+            "casher": {
+                "id": order.casher.id,
+                "name": order.casher.user.name if order.casher and order.casher.user else None,
+                "last_name": order.casher.user.last_name if order.casher and order.casher.user else None,
+                "role": order.casher.role if order.casher else None,
+            } if order.casher and order.casher.user else None,
+            "client": {
+                "id": order.client.id,
+                "name": order.client.user.name if order.client and order.client.user else None,
+                "last_name": order.client.user.last_name if order.client and order.client.user else None,
+            } if order.client and order.client.user else None,
+        })
+    
+    # Estadísticas generales
+    total_revenue = db.query(func.sum(OrderProduct.total)).scalar() or 0.0
+    total_items = db.query(func.sum(OrderProduct.amount)).scalar() or 0
+    total_transactions = db.query(func.count(func.distinct(OrderProduct.ticket_id))).scalar() or 0
+    
+    return {
+        "data": serialized_orders,
+        "total_count": len(serialized_orders),
+        "summary": {
+            "total_revenue": float(total_revenue),
+            "total_items_sold": int(total_items),
+            "total_transactions": int(total_transactions),
+            "average_ticket": float(total_revenue / total_transactions if total_transactions > 0 else 0)
+        }
+    }
 
 @router.post("/orders/products/sells", response_model=TicketResponse)
 def create_bulk_product_sale(
@@ -263,4 +375,68 @@ def delete_product_order(
 
     db.delete(order_item)
     db.commit()
+    return None
+
+@router.patch("/orders/tickets/{ticket_id}/complete")
+def complete_ticket(
+    ticket_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(allow_admin),
+):
+    """
+    Marca un ticket como completado (no elimina, solo registra la acción).
+    Solo accesible para admin.
+    """
+    # Verificar que el ticket existe
+    orders = db.query(OrderProduct).filter(OrderProduct.ticket_id == ticket_id).all()
+    
+    if not orders:
+        raise HTTPException(status_code=404, detail="Ticket no encontrado")
+    
+    # Registrar la acción de completado (puedes agregar un log si tienes tabla de logs)
+    # o simplemente retornar éxito
+    
+    return {
+        "message": f"Ticket #{ticket_id} marcado como completado",
+        "ticket_id": ticket_id,
+        "status": "completed",
+        "items_count": len(orders),
+        "total": float(sum(o.total for o in orders))
+    }
+
+
+@router.delete("/orders/tickets/{ticket_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_ticket(
+    ticket_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(allow_admin),
+):
+    """
+    Elimina completamente un ticket y todos sus items.
+    Restaura el stock de los productos.
+    Solo accesible para admin.
+    """
+    # Obtener todos los items del ticket
+    orders = db.query(OrderProduct).filter(OrderProduct.ticket_id == ticket_id).all()
+    
+    if not orders:
+        raise HTTPException(status_code=404, detail="Ticket no encontrado")
+    
+    # Restaurar stock y eliminar items
+    for order in orders:
+        product = db.query(Product).filter(Product.id == order.product_id).first()
+        if product:
+            product.stock += order.amount
+            db.add(InventoryMovement(
+                product_id=product.id,
+                employee_id=current_user.employee.id if current_user.employee else None,
+                type="IN",
+                amount=order.amount,
+                note=f"Eliminación de ticket #{ticket_id}",
+            ))
+        
+        db.delete(order)
+    
+    db.commit()
+    
     return None

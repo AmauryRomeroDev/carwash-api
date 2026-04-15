@@ -37,7 +37,7 @@ export function Signup() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8000/api/v1/auth/register/client", {
+      const response = await fetch("http://localhost:8000/api/v1/auth/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

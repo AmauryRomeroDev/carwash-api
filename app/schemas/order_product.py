@@ -28,7 +28,7 @@ class OrderProductRead(OrderProductBase):
     ticket_id: int
     client_id: Optional[int]
     product: ProductMinimalRead
-    casher:EmployeeMinimalRead
+    casher:Optional[EmployeeMinimalRead]=None
     amount: int
     total:float
     created_at: datetime=Field(default_factory=lambda:datetime.now(timezone.utc))
