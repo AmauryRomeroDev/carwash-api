@@ -39,8 +39,7 @@ export function Vehicles() {
     model: '',
     color: '',
     liscence_plate: '',
-    vehicle_type: 'sedan',
-    is_temporary: false, // Campo añadido
+    vehicle_type: 'sedan'
   });
 
   useEffect(() => {
@@ -52,31 +51,47 @@ export function Vehicles() {
     fetchUserData();
   }, [navigate]);
 
-  const fetchUserData = async () => {
-    const token = localStorage.getItem("access_token");
-    try {
-      const response = await fetch("http://localhost:8000/api/v1/users/me", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+const fetchUserData = async () => {
+  const token = localStorage.getItem("access_token");
+  
+  if (!token) {
+    console.error("No token found");
+    navigate("/");
+    return;
+  }
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          localStorage.clear();
-          navigate("/");
-          return;
-        }
-        throw new Error("Error al cargar datos del usuario");
+  try {
+    const response = await fetch("http://localhost:8000/api/v1/users/me", {
+      method: "GET", // Especificar método explícitamente
+      headers: { 
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json" // Añadir content-type
+      },
+    });
+
+    if (!response.ok) {
+      console.error("Response status:", response.status);
+      console.error("Response status text:", response.statusText);
+      
+      if (response.status === 401) {
+        localStorage.clear();
+        navigate("/");
+        return;
       }
-
-      const data = await response.json();
-      setUserData(data);
-      await fetchVehicles();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error de conexión");
-    } finally {
-      setIsLoading(false);
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
     }
-  };
+
+    const data = await response.json();
+    console.log("User data received:", data); // DEBUG
+    setUserData(data);
+    await fetchVehicles();
+  } catch (err) {
+    console.error("Fetch error:", err);
+    setError(err instanceof Error ? err.message : "Error de conexión");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const fetchVehicles = async () => {
     const token = localStorage.getItem("access_token");
@@ -107,10 +122,10 @@ export function Vehicles() {
         model: formData.model.trim(),
         color: formData.color.trim(),
         vehicle_type: formData.vehicle_type,
-        is_temporary: formData.is_temporary,
-        client_id: userData?.id // El backend resolverá si es user_id o client_id
+        is_temporary: false,
+        client_id: userData?.id 
       };
-
+      console.log("Enviando datos del vehículo:", vehicleData);
       const url = editingVehicle 
         ? `http://localhost:8000/api/v1/vehicles/${editingVehicle.id}`
         : "http://localhost:8000/api/v1/vehicles/";
@@ -146,7 +161,6 @@ export function Vehicles() {
       color: vehicle.color,
       liscence_plate: vehicle.liscence_plate,
       vehicle_type: vehicle.vehicle_type,
-      is_temporary: vehicle.is_temporary,
     });
     setShowForm(true);
   };
@@ -172,8 +186,7 @@ export function Vehicles() {
     setError("");
     setFormData({
       brand: '', model: '', color: '', 
-      liscence_plate: '', vehicle_type: 'sedan', 
-      is_temporary: false 
+      liscence_plate: '', vehicle_type: 'sedan'
     });
   };
 
@@ -308,20 +321,6 @@ export function Vehicles() {
                   <select className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" value={formData.vehicle_type} onChange={e => setFormData({...formData, vehicle_type: e.target.value})}>
                     {Object.entries(vehicleTypeLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
-                </div>
-
-                {/* Nuevo Campo: is_temporary */}
-                <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-2xl border border-blue-100">
-                  <input 
-                    type="checkbox" 
-                    id="is_temp" 
-                    className="w-5 h-5 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
-                    checked={formData.is_temporary}
-                    onChange={e => setFormData({...formData, is_temporary: e.target.checked})}
-                  />
-                  <label htmlFor="is_temp" className="text-sm font-semibold text-blue-900 cursor-pointer">
-                    Este es un vehículo temporal / de alquiler
-                  </label>
                 </div>
 
                 <button

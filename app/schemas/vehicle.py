@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from .client import ClientMinimalRead
 
 class VehicleBase(BaseModel):
-    liscence_plate: str = Field(...,min_length=10, max_length=20)
+    liscence_plate: str = Field(...,min_length=5, max_length=20)
     brand: str = Field(...,min_length=3, max_length=50)
     model: str = Field(...,min_length=3, max_length=50)
     color: Optional[str] = Field(None, min_length=1, max_length=30)
